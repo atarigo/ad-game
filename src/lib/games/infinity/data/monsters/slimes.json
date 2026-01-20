@@ -1,0 +1,66 @@
+[
+	{
+		"id": "slime_green",
+		"name": "綠史萊姆",
+		"color": "0x00aa00",
+		"baseAttributes": {
+			"strength": 8,
+			"vitality": 8,
+			"agility": 10,
+			"intelligence": 5,
+			"willpower": 5,
+			"luck": 5
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 300
+	},
+	{
+		"id": "slime_blue",
+		"name": "藍史萊姆",
+		"color": "0x0066cc",
+		"baseAttributes": {
+			"strength": 6,
+			"vitality": 10,
+			"agility": 8,
+			"intelligence": 8,
+			"willpower": 6,
+			"luck": 6
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 350
+	},
+	{
+		"id": "slime_red",
+		"name": "紅史萊姆",
+		"color": "0xcc3300",
+		"baseAttributes": {
+			"strength": 12,
+			"vitality": 6,
+			"agility": 12,
+			"intelligence": 4,
+			"willpower": 4,
+			"luck": 8
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 400
+	},
+	{
+		"id": "slime_king",
+		"name": "史萊姆王",
+		"color": "0xffd700",
+		"baseAttributes": {
+			"strength": 15,
+			"vitality": 20,
+			"agility": 8,
+			"intelligence": 10,
+			"willpower": 12,
+			"luck": 10
+		},
+		"weapon": "iron_sword",
+		"armor": "leather",
+		"basePointReward": 1500
+	}
+]

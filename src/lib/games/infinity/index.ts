@@ -24,6 +24,10 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 			mode: Phaser.Scale.FIT,
 			autoCenter: Phaser.Scale.CENTER_BOTH
 		},
+		render: {
+			antialias: true, // 啟用抗鋸齒
+			roundPixels: true // 像素對齊，減少文字模糊
+		},
 		audio: {
 			disableWebAudio: true // 禁用 WebAudio，避免場景切換時的 AudioContext 錯誤
 		}

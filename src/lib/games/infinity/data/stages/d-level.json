@@ -2,105 +2,174 @@
 	{
 		"id": "D-1",
 		"name": "史萊姆初遇",
-		"enemies": [
+		"tier": "D",
+		"waves": [
 			{
-				"name": "綠史萊姆",
-				"color": "0x00aa00",
-				"attributes": {
-					"strength": 8,
-					"vitality": 8,
-					"agility": 10,
-					"intelligence": 5,
-					"willpower": 5,
-					"luck": 5
-				},
-				"weapon": "wooden_sword",
-				"armor": "cloth_armor",
-				"position": { "row": 1, "col": 2 }
+				"id": "D-1-W1",
+				"enemies": [
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 500 }
+			},
+			{
+				"id": "D-1-W2",
+				"enemies": [
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 600 }
+			},
+			{
+				"id": "D-1-W3",
+				"enemies": [
+					{ "monsterId": "slime_green", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 800 }
 			}
 		]
 	},
 	{
 		"id": "D-2",
 		"name": "哥布林斥候",
-		"enemies": [
+		"tier": "D",
+		"waves": [
 			{
-				"name": "哥布林",
-				"color": "0x8b4513",
-				"attributes": {
-					"strength": 10,
-					"vitality": 7,
-					"agility": 12,
-					"intelligence": 6,
-					"willpower": 5,
-					"luck": 8
-				},
-				"weapon": "wooden_sword",
-				"armor": "cloth_armor",
-				"position": { "row": 2, "col": 1 }
+				"id": "D-2-W1",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 1 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 500 }
+			},
+			{
+				"id": "D-2-W2",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 700 }
+			},
+			{
+				"id": "D-2-W3",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 0 } },
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 2 } },
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 900 }
 			}
 		]
 	},
 	{
 		"id": "D-3",
 		"name": "野狼來襲",
-		"enemies": [
+		"tier": "D",
+		"waves": [
 			{
-				"name": "灰狼",
-				"color": "0x696969",
-				"attributes": {
-					"strength": 11,
-					"vitality": 9,
-					"agility": 13,
-					"intelligence": 4,
-					"willpower": 6,
-					"luck": 7
-				},
-				"weapon": "wooden_sword",
-				"armor": "cloth_armor",
-				"position": { "row": 1, "col": 3 }
+				"id": "D-3-W1",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 600 }
+			},
+			{
+				"id": "D-3-W2",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 800 }
+			},
+			{
+				"id": "D-3-W3",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "survive", "rounds": 5 },
+				"reward": { "points": 1000 }
 			}
 		]
 	},
 	{
 		"id": "D-4",
 		"name": "蝙蝠洞穴",
-		"enemies": [
+		"tier": "D",
+		"waves": [
 			{
-				"name": "洞穴蝙蝠",
-				"color": "0x4a4a4a",
-				"attributes": {
-					"strength": 7,
-					"vitality": 6,
-					"agility": 15,
-					"intelligence": 5,
-					"willpower": 5,
-					"luck": 10
-				},
-				"weapon": "wooden_sword",
-				"armor": "cloth_armor",
-				"position": { "row": 0, "col": 2 }
+				"id": "D-4-W1",
+				"enemies": [
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 500 }
+			},
+			{
+				"id": "D-4-W2",
+				"enemies": [
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 700 }
+			},
+			{
+				"id": "D-4-W3",
+				"enemies": [
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 0 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 900 }
 			}
 		]
 	},
 	{
 		"id": "D-5",
 		"name": "骷髏士兵",
-		"enemies": [
+		"tier": "D",
+		"waves": [
 			{
-				"name": "骷髏兵",
-				"color": "0xf5f5dc",
-				"attributes": {
-					"strength": 12,
-					"vitality": 10,
-					"agility": 8,
-					"intelligence": 3,
-					"willpower": 8,
-					"luck": 5
-				},
-				"weapon": "wooden_sword",
-				"armor": "cloth_armor",
-				"position": { "row": 2, "col": 2 }
+				"id": "D-5-W1",
+				"enemies": [
+					{ "monsterId": "skeleton", "position": { "row": 2, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 600 }
+			},
+			{
+				"id": "D-5-W2",
+				"enemies": [
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "skeleton", "position": { "row": 2, "col": 2 } },
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 900 }
+			},
+			{
+				"id": "D-5-W3",
+				"enemies": [
+					{ "monsterId": "boss_d_slime_king", "position": { "row": 1, "col": 2 }, "instanceId": "boss" }
+				],
+				"winCondition": { "type": "target", "targetId": "boss" },
+				"reward": { "points": 1500 }
 			}
 		]
 	}

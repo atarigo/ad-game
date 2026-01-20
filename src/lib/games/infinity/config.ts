@@ -69,7 +69,7 @@ export const ENEMY_GRID = {
 	rows: 4, // 4 列
 	cellSize: 60, // 格子大小
 	gap: 12, // 格子間距
-	topPadding: 40, // 距離頂部的間距
+	topPadding: 55, // 距離頂部的間距（留空給頂部文字）
 	strokeWidth: 2
 } as const;
 

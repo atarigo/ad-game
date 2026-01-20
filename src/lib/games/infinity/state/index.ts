@@ -4,10 +4,11 @@ export {
 	MAP_LEVEL_ORDER,
 	STAGES_PER_MAP,
 	TOTAL_STAGES,
-	getAvailablePotions
+	getAvailablePotions,
+	getPotionPrice
 } from './GameState';
 
 export type { IGameState } from './GameState';
 
 // Re-export from data for convenience
-export type { StageConfig, EnemyConfig } from '../data';
+export type { StageConfig, EnemyConfig, WaveConfig, WinCondition, EnemySpawn } from '../data';

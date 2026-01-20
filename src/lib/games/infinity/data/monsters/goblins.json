@@ -1,0 +1,66 @@
+[
+	{
+		"id": "goblin",
+		"name": "哥布林",
+		"color": "0x8b4513",
+		"baseAttributes": {
+			"strength": 10,
+			"vitality": 7,
+			"agility": 12,
+			"intelligence": 6,
+			"willpower": 5,
+			"luck": 8
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 350
+	},
+	{
+		"id": "goblin_warrior",
+		"name": "哥布林戰士",
+		"color": "0x6b4423",
+		"baseAttributes": {
+			"strength": 14,
+			"vitality": 10,
+			"agility": 10,
+			"intelligence": 5,
+			"willpower": 6,
+			"luck": 7
+		},
+		"weapon": "iron_sword",
+		"armor": "leather",
+		"basePointReward": 450
+	},
+	{
+		"id": "goblin_shaman",
+		"name": "哥布林薩滿",
+		"color": "0x9b6433",
+		"baseAttributes": {
+			"strength": 8,
+			"vitality": 8,
+			"agility": 9,
+			"intelligence": 14,
+			"willpower": 10,
+			"luck": 9
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 500
+	},
+	{
+		"id": "goblin_chief",
+		"name": "哥布林酋長",
+		"color": "0x4a3010",
+		"baseAttributes": {
+			"strength": 18,
+			"vitality": 15,
+			"agility": 12,
+			"intelligence": 10,
+			"willpower": 10,
+			"luck": 10
+		},
+		"weapon": "steel_sword",
+		"armor": "iron_armor",
+		"basePointReward": 1800
+	}
+]

@@ -1,0 +1,98 @@
+[
+	{
+		"id": "bat_cave",
+		"name": "洞穴蝙蝠",
+		"color": "0x4a4a4a",
+		"baseAttributes": {
+			"strength": 7,
+			"vitality": 6,
+			"agility": 15,
+			"intelligence": 5,
+			"willpower": 5,
+			"luck": 10
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 250
+	},
+	{
+		"id": "skeleton",
+		"name": "骷髏兵",
+		"color": "0xf5f5dc",
+		"baseAttributes": {
+			"strength": 12,
+			"vitality": 10,
+			"agility": 8,
+			"intelligence": 3,
+			"willpower": 8,
+			"luck": 5
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 400
+	},
+	{
+		"id": "skeleton_warrior",
+		"name": "骷髏戰士",
+		"color": "0xe5e5cc",
+		"baseAttributes": {
+			"strength": 15,
+			"vitality": 12,
+			"agility": 10,
+			"intelligence": 4,
+			"willpower": 10,
+			"luck": 6
+		},
+		"weapon": "iron_sword",
+		"armor": "leather",
+		"basePointReward": 500
+	},
+	{
+		"id": "zombie",
+		"name": "殭屍",
+		"color": "0x556b2f",
+		"baseAttributes": {
+			"strength": 14,
+			"vitality": 16,
+			"agility": 5,
+			"intelligence": 2,
+			"willpower": 12,
+			"luck": 3
+		},
+		"weapon": "wooden_sword",
+		"armor": "leather",
+		"basePointReward": 450
+	},
+	{
+		"id": "ghost",
+		"name": "幽靈",
+		"color": "0xc0c0c0",
+		"baseAttributes": {
+			"strength": 8,
+			"vitality": 8,
+			"agility": 14,
+			"intelligence": 12,
+			"willpower": 14,
+			"luck": 8
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 550
+	},
+	{
+		"id": "lich",
+		"name": "巫妖",
+		"color": "0x800080",
+		"baseAttributes": {
+			"strength": 10,
+			"vitality": 12,
+			"agility": 10,
+			"intelligence": 20,
+			"willpower": 18,
+			"luck": 10
+		},
+		"weapon": "steel_sword",
+		"armor": "iron_armor",
+		"basePointReward": 2000
+	}
+]

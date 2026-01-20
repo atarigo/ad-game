@@ -1,22 +1,65 @@
 [
 	{
 		"id": "A-1",
-		"name": "A級關卡 1",
-		"enemies": [
+		"name": "亡靈墓地",
+		"tier": "A",
+		"waves": [
 			{
-				"name": "暗影騎士",
-				"color": "0x2f4f4f",
-				"attributes": {
-					"strength": 18,
-					"vitality": 18,
-					"agility": 16,
-					"intelligence": 14,
-					"willpower": 14,
-					"luck": 14
-				},
-				"weapon": "steel_sword",
-				"armor": "iron_armor",
-				"position": { "row": 1, "col": 2 }
+				"id": "A-1-W1",
+				"enemies": [
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 3 } },
+					{ "monsterId": "zombie", "position": { "row": 2, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1500 }
+			},
+			{
+				"id": "A-1-W2",
+				"enemies": [
+					{ "monsterId": "skeleton_warrior", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 0 } },
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 4 } },
+					{ "monsterId": "zombie", "position": { "row": 2, "col": 1 } },
+					{ "monsterId": "zombie", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 2000 }
+			},
+			{
+				"id": "A-1-W3",
+				"enemies": [
+					{ "monsterId": "ghost", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "ghost", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "skeleton_warrior", "position": { "row": 1, "col": 2 } },
+					{ "monsterId": "zombie", "position": { "row": 2, "col": 0 } },
+					{ "monsterId": "zombie", "position": { "row": 2, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 2500 }
+			},
+			{
+				"id": "A-1-W4",
+				"enemies": [
+					{ "monsterId": "ghost", "position": { "row": 0, "col": 0 } },
+					{ "monsterId": "ghost", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "ghost", "position": { "row": 0, "col": 4 } },
+					{ "monsterId": "skeleton_warrior", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "skeleton_warrior", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "survive", "rounds": 10 },
+				"reward": { "points": 3000 }
+			},
+			{
+				"id": "A-1-W5",
+				"enemies": [
+					{ "monsterId": "boss_a_lich_lord", "position": { "row": 0, "col": 2 }, "instanceId": "boss" },
+					{ "monsterId": "ghost", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "ghost", "position": { "row": 1, "col": 3 } },
+					{ "monsterId": "skeleton_warrior", "position": { "row": 2, "col": 2 } }
+				],
+				"winCondition": { "type": "target", "targetId": "boss" },
+				"reward": { "points": 5000 }
 			}
 		]
 	}

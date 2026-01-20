@@ -1,22 +1,51 @@
 [
 	{
 		"id": "B-1",
-		"name": "B級關卡 1",
-		"enemies": [
+		"name": "狼群領地",
+		"tier": "B",
+		"waves": [
 			{
-				"name": "精英哥布林",
-				"color": "0xcd853f",
-				"attributes": {
-					"strength": 15,
-					"vitality": 15,
-					"agility": 15,
-					"intelligence": 10,
-					"willpower": 10,
-					"luck": 12
-				},
-				"weapon": "iron_sword",
-				"armor": "leather",
-				"position": { "row": 1, "col": 2 }
+				"id": "B-1-W1",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 3 } },
+					{ "monsterId": "wolf_black", "position": { "row": 2, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1200 }
+			},
+			{
+				"id": "B-1-W2",
+				"enemies": [
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 0 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1500 }
+			},
+			{
+				"id": "B-1-W3",
+				"enemies": [
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 0 } },
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 4 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "survive", "rounds": 8 },
+				"reward": { "points": 2000 }
+			},
+			{
+				"id": "B-1-W4",
+				"enemies": [
+					{ "monsterId": "boss_b_alpha_wolf", "position": { "row": 1, "col": 2 }, "instanceId": "boss" },
+					{ "monsterId": "wolf_black", "position": { "row": 2, "col": 1 } },
+					{ "monsterId": "wolf_black", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "target", "targetId": "boss" },
+				"reward": { "points": 3500 }
 			}
 		]
 	}

@@ -22,7 +22,8 @@ import {
 	createDefaultWeapon
 } from '../entities';
 import { GameState } from '../state';
-import type { EnemyConfig, StageConfig } from '../data';
+import type { StageConfig, WaveConfig, WinCondition, EnemySpawn, MonsterInstance } from '../data';
+import { createMonsterInstance, createMonsterFromLegacy } from '../data';
 
 // 血量條結構
 interface HealthBar {
@@ -49,18 +50,26 @@ interface ItemSlot {
 	index: number;
 }
 
+// 敵人實體結構（運行時）
+interface EnemyEntity {
+	gameObject: Phaser.GameObjects.Rectangle;
+	healthBar: HealthBar;
+	stats: CharacterStats;
+	instance: MonsterInstance;
+	isAlive: boolean;
+}
+
 export class MainScene extends Phaser.Scene {
 	private player!: Phaser.GameObjects.Sprite;
-	private enemy!: Phaser.GameObjects.Rectangle;
 	private gridPositions: { x: number; y: number }[] = [];
 
-	// 角色狀態
+	// 玩家狀態
 	private playerStats!: CharacterStats;
-	private enemyStats!: CharacterStats;
-
-	// 血量條
 	private playerHealthBar!: HealthBar;
-	private enemyHealthBar!: HealthBar;
+
+	// 敵人管理
+	private enemies: EnemyEntity[] = [];
+	private selectedEnemyIndex: number = 0;
 
 	// 資訊抽屜
 	private infoDrawer!: InfoDrawer;
@@ -71,13 +80,17 @@ export class MainScene extends Phaser.Scene {
 	private turnCount: number = 0;
 	private turnText!: Phaser.GameObjects.Text;
 
+	// 波次系統
+	private currentWaveIndex: number = 0;
+	private waveInfoText!: Phaser.GameObjects.Text;
+	private winConditionText!: Phaser.GameObjects.Text;
+
 	// 道具格
 	private itemSlots: ItemSlot[] = [];
 
 	// 遊戲狀態
 	private gameState!: GameState;
 	private stageInfoText!: Phaser.GameObjects.Text;
-	private currentEnemyName: string = '敵人';
 
 	constructor() {
 		super({ key: 'MainScene' });
@@ -89,12 +102,53 @@ export class MainScene extends Phaser.Scene {
 	}
 
 	create() {
-		// 初始化角色狀態
-		this.initializeStats();
+		// 重置波次
+		this.currentWaveIndex = 0;
+		this.turnCount = 0;
+		this.enemies = [];
+
+		// 初始化遊戲狀態
+		this.gameState = GameState.getInstance();
+		this.playerStats = this.gameState.playerStats;
 
 		// 建立深綠色背景（敵人區域）
 		this.cameras.main.setBackgroundColor(COLORS.background);
 
+		// 繪製 UI 區域
+		this.createZones();
+
+		// 繪製敵人格子 (5x4)
+		this.createEnemyGrid();
+
+		// 建立玩家
+		this.createPlayer();
+
+		// 建立玩家血量條
+		this.createPlayerHealthBar();
+
+		// 建立技能格
+		this.createSkillSlots();
+
+		// 建立道具格
+		this.createItemSlots();
+
+		// 建立 UI
+		this.createUI();
+
+		// 建立資訊抽屜
+		this.createInfoDrawer();
+
+		// 生成第一波敵人
+		this.spawnWave();
+
+		// 設置角色互動
+		this.setupCharacterInteraction();
+	}
+
+	/**
+	 * 建立區域背景
+	 */
+	private createZones() {
 		// 繪製 UI 區域（最底部）
 		this.add.rectangle(
 			GAME_WIDTH / 2,
@@ -105,8 +159,7 @@ export class MainScene extends Phaser.Scene {
 		);
 
 		// 繪製技能格區域（UI 區域上方）
-		const skillRowY =
-			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight / 2;
+		const skillRowY = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight / 2;
 		this.add.rectangle(
 			GAME_WIDTH / 2,
 			skillRowY,
@@ -117,10 +170,7 @@ export class MainScene extends Phaser.Scene {
 
 		// 繪製道具格區域（技能格上方）
 		const itemRowY =
-			GAME_HEIGHT -
-			ZONES.uiAreaHeight -
-			ZONES.skillRowHeight -
-			ZONES.itemRowHeight / 2;
+			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight / 2;
 		this.add.rectangle(
 			GAME_WIDTH / 2,
 			itemRowY,
@@ -145,50 +195,53 @@ export class MainScene extends Phaser.Scene {
 		);
 
 		// 繪製區域分隔線
-		const dividerY1 =
-			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight - ZONES.playerAreaHeight;
-		this.add.rectangle(
-			GAME_WIDTH / 2,
-			dividerY1,
-			GAME_WIDTH,
-			2,
-			COLORS.zoneDivider
-		);
+		const dividerPositions = [
+			GAME_HEIGHT -
+				ZONES.uiAreaHeight -
+				ZONES.skillRowHeight -
+				ZONES.itemRowHeight -
+				ZONES.playerAreaHeight,
+			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight,
+			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight,
+			GAME_HEIGHT - ZONES.uiAreaHeight
+		];
 
-		const dividerY2 = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight;
-		this.add.rectangle(
-			GAME_WIDTH / 2,
-			dividerY2,
-			GAME_WIDTH,
-			2,
-			COLORS.zoneDivider
-		);
+		for (const y of dividerPositions) {
+			this.add.rectangle(GAME_WIDTH / 2, y, GAME_WIDTH, 2, COLORS.zoneDivider);
+		}
+	}
 
-		const dividerY3 = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight;
-		this.add.rectangle(
-			GAME_WIDTH / 2,
-			dividerY3,
-			GAME_WIDTH,
-			2,
-			COLORS.zoneDivider
-		);
+	/**
+	 * 建立敵人格子
+	 */
+	private createEnemyGrid() {
+		const { columns, rows, cellSize, gap, topPadding, strokeWidth } = ENEMY_GRID;
 
-		const dividerY4 = GAME_HEIGHT - ZONES.uiAreaHeight;
-		this.add.rectangle(
-			GAME_WIDTH / 2,
-			dividerY4,
-			GAME_WIDTH,
-			2,
-			COLORS.zoneDivider
-		);
+		// 計算起始位置
+		const totalWidth = columns * cellSize + (columns - 1) * gap;
+		const startX = (GAME_WIDTH - totalWidth) / 2 + cellSize / 2;
+		const startY = topPadding + cellSize / 2;
 
-		// 繪製敵人格子 (5x4)
-		this.createEnemyGrid();
+		for (let row = 0; row < rows; row++) {
+			for (let col = 0; col < columns; col++) {
+				const x = startX + col * (cellSize + gap);
+				const y = startY + row * (cellSize + gap);
 
-		// 隨機生成一個敵人
-		this.spawnEnemy();
+				// 繪製格子邊框
+				const cell = this.add.rectangle(x, y, cellSize, cellSize);
+				cell.setStrokeStyle(strokeWidth, COLORS.enemySlotStroke);
+				cell.setFillStyle();
 
-		// 建立玩家精靈（置於玩家區域中央）
+				// 儲存格子位置
+				this.gridPositions.push({ x, y });
+			}
+		}
+	}
+
+	/**
+	 * 建立玩家
+	 */
+	private createPlayer() {
 		const playerY =
 			GAME_HEIGHT -
 			ZONES.uiAreaHeight -
@@ -198,106 +251,172 @@ export class MainScene extends Phaser.Scene {
 		this.player = this.add.sprite(GAME_WIDTH / 2, playerY, 'player');
 
 		// 縮放圖片以適應玩家區域（保持比例）
-		const targetHeight = ZONES.playerAreaHeight - 20; // 留一些邊距
+		const targetHeight = ZONES.playerAreaHeight - 20;
 		const scale = targetHeight / this.player.height;
 		this.player.setScale(scale);
-
-		// 設置玩家深度，確保可被點擊
 		this.player.setDepth(10);
-
-		// 建立血量條
-		this.createHealthBars();
-
-		// 建立技能格
-		this.createSkillSlots();
-
-		// 建立道具格
-		this.createItemSlots();
-
-		// 建立資訊抽屜
-		this.createInfoDrawer();
-
-		// 設置角色點擊事件
-		this.setupCharacterInteraction();
-
-		// 設置點擊其他區域關閉抽屜
-		this.setupBackgroundClick();
-
-		// 建立 UI
-		this.createUI();
-	}
-
-	private createEnemyGrid() {
-		const { columns, rows, cellSize, gap, topPadding, strokeWidth } = ENEMY_GRID;
-
-		// 計算格子總寬度和起始位置（置中）
-		const gridWidth = columns * cellSize + (columns - 1) * gap;
-		const startX = (GAME_WIDTH - gridWidth) / 2 + cellSize / 2;
-		const startY = topPadding + cellSize / 2;
-
-		// 清空格子位置陣列
-		this.gridPositions = [];
-
-		for (let row = 0; row < rows; row++) {
-			for (let col = 0; col < columns; col++) {
-				const x = startX + col * (cellSize + gap);
-				const y = startY + row * (cellSize + gap);
-
-				// 儲存格子位置
-				this.gridPositions.push({ x, y });
-
-				const slot = this.add.rectangle(x, y, cellSize, cellSize, COLORS.enemySlot);
-				slot.setStrokeStyle(strokeWidth, COLORS.enemySlotStroke);
-			}
-		}
-	}
-
-	private spawnEnemy() {
-		const { cellSize, strokeWidth, columns } = ENEMY_GRID;
-
-		// 取得當前關卡配置
-		const stageConfig = this.gameState.currentStageConfig;
-		const enemyConfig = stageConfig.enemies[0]; // 目前只處理第一個敵人
-
-		// 根據關卡配置的位置計算座標
-		const gridIndex = enemyConfig.position.row * columns + enemyConfig.position.col;
-		const position = this.gridPositions[gridIndex] || this.gridPositions[0];
-
-		// 使用關卡配置的顏色
-		const enemyColor = enemyConfig.color;
-		const enemyStrokeColor = Phaser.Display.Color.ValueToColor(enemyColor).darken(30).color;
-
-		// 建立敵人
-		this.enemy = this.add.rectangle(
-			position.x,
-			position.y,
-			cellSize - 10, // 稍微小一點，讓格子邊框可見
-			cellSize - 10,
-			enemyColor
-		);
-		this.enemy.setStrokeStyle(strokeWidth, enemyStrokeColor);
-
-		// 設置敵人深度，確保在血量條之上可被點擊
-		this.enemy.setDepth(10);
 	}
 
 	/**
-	 * 建立血量條
+	 * 建立玩家血量條
 	 */
-	private createHealthBars() {
-		// 玩家血量條（使用縮放後的實際高度）
+	private createPlayerHealthBar() {
 		const playerDisplayHeight = this.player.displayHeight;
 		this.playerHealthBar = this.createHealthBar(
 			this.player.x,
 			this.player.y - playerDisplayHeight / 2 - HEALTH_BAR.offsetY
 		);
+	}
 
-		// 敵人血量條
-		const enemySize = ENEMY_GRID.cellSize - 10;
-		this.enemyHealthBar = this.createHealthBar(
-			this.enemy.x,
-			this.enemy.y - enemySize / 2 - HEALTH_BAR.offsetY
+	/**
+	 * 生成當前波次的敵人
+	 */
+	private spawnWave() {
+		// 清除舊敵人
+		this.clearEnemies();
+
+		const stageConfig = this.gameState.currentStageConfig;
+		const wave = stageConfig.waves[this.currentWaveIndex];
+
+		if (!wave) {
+			console.error('No wave found at index', this.currentWaveIndex);
+			return;
+		}
+
+		console.log(`\n========== 波次 ${this.currentWaveIndex + 1}/${stageConfig.waves.length} ==========`);
+		console.log(`勝利條件: ${this.getWinConditionText(wave.winCondition)}`);
+
+		// 生成每個敵人
+		for (const spawn of wave.enemies) {
+			this.spawnEnemy(spawn, stageConfig);
+		}
+
+		// 選中第一個敵人
+		this.selectedEnemyIndex = 0;
+		this.highlightSelectedEnemy();
+
+		// 更新波次資訊
+		this.updateWaveInfo();
+	}
+
+	/**
+	 * 生成單個敵人
+	 */
+	private spawnEnemy(spawn: EnemySpawn, stageConfig: StageConfig) {
+		// 建立怪物實例
+		let instance: MonsterInstance | null;
+
+		if (spawn.monsterId.startsWith('legacy_')) {
+			instance = createMonsterFromLegacy(spawn, stageConfig);
+		} else {
+			instance = createMonsterInstance(
+				spawn.monsterId,
+				stageConfig.tier,
+				spawn.position,
+				spawn.instanceId
+			);
+		}
+
+		if (!instance) {
+			console.error('Failed to create monster instance:', spawn.monsterId);
+			return;
+		}
+
+		// 計算位置
+		const { columns } = ENEMY_GRID;
+		const gridIndex = spawn.position.row * columns + spawn.position.col;
+		const position = this.gridPositions[gridIndex];
+
+		if (!position) {
+			console.error('Invalid grid position:', spawn.position);
+			return;
+		}
+
+		// 建立敵人圖形
+		const { cellSize, strokeWidth } = ENEMY_GRID;
+		const enemyColor = instance.color;
+		const enemyStrokeColor = Phaser.Display.Color.ValueToColor(enemyColor).darken(30).color;
+
+		const gameObject = this.add.rectangle(
+			position.x,
+			position.y,
+			cellSize - 10,
+			cellSize - 10,
+			enemyColor
 		);
+		gameObject.setStrokeStyle(strokeWidth, enemyStrokeColor);
+		gameObject.setDepth(10);
+
+		// 建立敵人狀態
+		const stats = new CharacterStats(
+			instance.attributes,
+			{},
+			{
+				weapon: instance.weapon ? WEAPONS[instance.weapon] : createDefaultWeapon(),
+				armor: instance.armor ? ARMORS[instance.armor] : createDefaultArmor(),
+				items: [],
+				maxItemSlots: 0
+			}
+		);
+
+		// 建立血量條
+		const healthBar = this.createHealthBar(
+			position.x,
+			position.y - (cellSize - 10) / 2 - HEALTH_BAR.offsetY
+		);
+
+		// 建立敵人實體
+		const enemy: EnemyEntity = {
+			gameObject,
+			healthBar,
+			stats,
+			instance,
+			isAlive: true
+		};
+
+		this.enemies.push(enemy);
+
+		// 設置互動
+		gameObject.setInteractive({ useHandCursor: true });
+		const enemyIndex = this.enemies.length - 1;
+
+		gameObject.on('pointerdown', () => {
+			this.clickedOnCharacter = true;
+			this.selectedEnemyIndex = enemyIndex;
+			this.highlightSelectedEnemy();
+			this.openDrawer(instance!.name, stats);
+		});
+
+		console.log(`[生成] ${instance.name} 在位置 (${spawn.position.row}, ${spawn.position.col})`);
+	}
+
+	/**
+	 * 清除所有敵人
+	 */
+	private clearEnemies() {
+		for (const enemy of this.enemies) {
+			enemy.gameObject.destroy();
+			enemy.healthBar.background.destroy();
+			enemy.healthBar.fill.destroy();
+		}
+		this.enemies = [];
+	}
+
+	/**
+	 * 高亮選中的敵人
+	 */
+	private highlightSelectedEnemy() {
+		for (let i = 0; i < this.enemies.length; i++) {
+			const enemy = this.enemies[i];
+			if (!enemy.isAlive) continue;
+
+			if (i === this.selectedEnemyIndex) {
+				enemy.gameObject.setStrokeStyle(3, 0xffff00); // 黃色高亮
+			} else {
+				const strokeColor = Phaser.Display.Color.ValueToColor(enemy.instance.color).darken(30).color;
+				enemy.gameObject.setStrokeStyle(ENEMY_GRID.strokeWidth, strokeColor);
+			}
+		}
 	}
 
 	/**
@@ -306,34 +425,30 @@ export class MainScene extends Phaser.Scene {
 	private createHealthBar(x: number, y: number): HealthBar {
 		const { width, height, strokeWidth } = HEALTH_BAR;
 
-		// 背景（灰色）- 以中心為原點
 		const background = this.add.rectangle(x, y, width, height, COLORS.healthBarBackground);
 		background.setStrokeStyle(strokeWidth, COLORS.healthBarStroke);
+		background.setDepth(20);
 
-		// 血量填充（綠色）- 以左側中心為原點
-		const fillX = x - width / 2 + 1; // 背景左邊界 + 1px 邊距
+		const fillX = x - width / 2 + 1;
 		const fill = this.add.rectangle(fillX, y, width - 2, height - 2, COLORS.healthBarFill);
-		fill.setOrigin(0, 0.5); // 設置原點為左側中心
+		fill.setOrigin(0, 0.5);
+		fill.setDepth(21);
 
 		return { background, fill };
 	}
 
 	/**
-	 * 更新血量條顯示
+	 * 更新血量條
 	 */
 	private updateHealthBar(healthBar: HealthBar, stats: CharacterStats) {
-		const { width, lowHealthThreshold } = HEALTH_BAR;
+		const { width } = HEALTH_BAR;
 		const healthPercent = stats.currentHealth / stats.derived.healthPoints;
+		const newWidth = Math.max(0, (width - 2) * healthPercent);
 
-		// 計算填充寬度
-		const maxFillWidth = width - 2;
-		const fillWidth = Math.max(0, maxFillWidth * healthPercent);
+		healthBar.fill.width = newWidth;
 
-		// 因為 origin 設為 (0, 0.5)，只需更新寬度即可
-		healthBar.fill.width = fillWidth;
-
-		// 根據血量百分比改變顏色
-		if (healthPercent <= lowHealthThreshold) {
+		// 低血量變紅
+		if (healthPercent <= 0.3) {
 			healthBar.fill.setFillStyle(COLORS.healthBarLow);
 		} else {
 			healthBar.fill.setFillStyle(COLORS.healthBarFill);
@@ -344,16 +459,16 @@ export class MainScene extends Phaser.Scene {
 	 * 建立技能格
 	 */
 	private createSkillSlots() {
-		const { count, size, gap, padding, strokeWidth } = SKILL_SLOTS;
+		const { size, gap, padding } = SKILL_SLOTS;
 		const skillRowY = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight / 2;
 
-		// 從左邊開始排列
+		// 從左側開始排列
 		const startX = padding + size / 2;
 
-		for (let i = 0; i < count; i++) {
+		for (let i = 0; i < 3; i++) {
 			const x = startX + i * (size + gap);
 			const slot = this.add.rectangle(x, skillRowY, size, size, COLORS.skillSlot);
-			slot.setStrokeStyle(strokeWidth, COLORS.skillSlotStroke);
+			slot.setStrokeStyle(2, COLORS.skillSlotStroke);
 		}
 	}
 
@@ -361,218 +476,80 @@ export class MainScene extends Phaser.Scene {
 	 * 建立道具格
 	 */
 	private createItemSlots() {
-		const { size, gap, padding, strokeWidth } = ITEM_SLOTS;
+		const { size, gap, padding } = ITEM_SLOTS;
 		const itemRowY =
 			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight / 2;
 
-		// 取得玩家道具欄位數量
-		const maxSlots = this.playerStats.maxItemSlots;
-
-		// 從左邊開始排列
+		// 從左側開始排列
 		const startX = padding + size / 2;
 
-		// 清空舊的道具格
 		this.itemSlots = [];
 
-		// 建立道具格
-		for (let i = 0; i < maxSlots; i++) {
+		for (let i = 0; i < this.playerStats.maxItemSlots; i++) {
 			const x = startX + i * (size + gap);
-			const slot = this.add.rectangle(x, itemRowY, size, size, COLORS.itemSlot);
-			slot.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
 
-			let itemText: Phaser.GameObjects.Text | null = null;
+			const hasItem = i < this.playerStats.items.length;
+			const bgColor = hasItem ? COLORS.itemSlotFilled : COLORS.itemSlot;
 
-			// 如果有道具，顯示道具
-			if (i < this.playerStats.items.length) {
+			const background = this.add.rectangle(x, itemRowY, size, size, bgColor);
+			background.setStrokeStyle(2, COLORS.itemSlotStroke);
+
+			let text: Phaser.GameObjects.Text | null = null;
+			if (hasItem) {
 				const item = this.playerStats.items[i];
-				// 在格子中央顯示道具圖示或文字
-				itemText = this.add.text(x, itemRowY, item.name.charAt(0), {
+				text = this.add.text(x, itemRowY, item.name.charAt(0), {
 					fontSize: '16px',
 					color: '#ffffff',
 					fontFamily: 'Arial'
 				});
-				itemText.setOrigin(0.5);
-
-				// 將格子改為有道具的顏色
-				slot.setFillStyle(COLORS.itemSlotFilled);
-
-				// 設置互動
-				slot.setInteractive({ useHandCursor: true });
-
-				// 點擊事件
-				const slotIndex = i;
-				slot.on('pointerdown', () => {
-					this.useItemAtSlot(slotIndex);
-				});
-
-				// 懸停效果
-				slot.on('pointerover', () => {
-					slot.setStrokeStyle(strokeWidth + 1, COLORS.itemSlotStroke);
-				});
-
-				slot.on('pointerout', () => {
-					slot.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
-				});
+				text.setOrigin(0.5);
 			}
 
-			// 存儲道具格引用
-			this.itemSlots.push({
-				background: slot,
-				text: itemText,
-				index: i
-			});
+			const slot: ItemSlot = { background, text, index: i };
+			this.itemSlots.push(slot);
+
+			if (hasItem) {
+				background.setInteractive({ useHandCursor: true });
+
+				background.on('pointerover', () => {
+					background.setStrokeStyle(3, COLORS.itemSlotStroke);
+				});
+
+				background.on('pointerout', () => {
+					background.setStrokeStyle(2, COLORS.itemSlotStroke);
+				});
+
+				background.on('pointerdown', () => {
+					this.useItemAtSlot(i);
+				});
+			}
 		}
 	}
 
 	/**
-	 * 使用指定位置的道具
+	 * 使用道具
 	 */
-	private useItemAtSlot(slotIndex: number) {
-		// 檢查是否有道具
-		if (slotIndex >= this.playerStats.items.length) {
-			console.log(`道具格 ${slotIndex} 沒有道具`);
-			return;
-		}
-
-		const item = this.playerStats.items[slotIndex];
-		const beforeHealth = this.playerStats.currentHealth;
-
-		// 使用道具
-		const success = this.playerStats.useItem(slotIndex);
-
-		if (success) {
-			const afterHealth = this.playerStats.currentHealth;
-			const healed = afterHealth - beforeHealth;
-
-			console.log(
-				`[使用道具] ${item.name} | 回復: ${healed.toFixed(1)} | 血量: ${afterHealth.toFixed(1)}/${this.playerStats.derived.healthPoints}`
-			);
-
-			// 更新血量條
+	private useItemAtSlot(index: number) {
+		if (this.playerStats.useItem(index)) {
 			this.updateHealthBar(this.playerHealthBar, this.playerStats);
-
-			// 閃爍效果（綠色表示回復）
 			this.flashEffect(this.player, 0x00ff00);
-
-			// 更新道具欄顯示
 			this.updateItemSlots();
 
-			// 如果資訊抽屜開啟且顯示玩家，更新內容
 			if (this.isDrawerOpen) {
-				this.updateDrawerContent(this.playerStats, '玩家');
+				this.updateDrawerContent('玩家', this.playerStats);
 			}
 		}
 	}
 
 	/**
-	 * 更新道具格顯示
+	 * 更新道具格
 	 */
 	private updateItemSlots() {
-		const { size, strokeWidth } = ITEM_SLOTS;
-
-		for (let i = 0; i < this.itemSlots.length; i++) {
-			const slot = this.itemSlots[i];
-
-			// 移除舊的文字
-			if (slot.text) {
-				slot.text.destroy();
-				slot.text = null;
-			}
-
-			// 移除舊的事件監聽器
-			slot.background.removeAllListeners();
-			slot.background.disableInteractive();
-
-			// 如果有道具，更新顯示
-			if (i < this.playerStats.items.length) {
-				const item = this.playerStats.items[i];
-
-				// 建立新的文字
-				slot.text = this.add.text(slot.background.x, slot.background.y, item.name.charAt(0), {
-					fontSize: '16px',
-					color: '#ffffff',
-					fontFamily: 'Arial'
-				});
-				slot.text.setOrigin(0.5);
-
-				// 更新顏色
-				slot.background.setFillStyle(COLORS.itemSlotFilled);
-
-				// 重新設置互動
-				slot.background.setInteractive({ useHandCursor: true });
-
-				const slotIndex = i;
-				slot.background.on('pointerdown', () => {
-					this.useItemAtSlot(slotIndex);
-				});
-
-				slot.background.on('pointerover', () => {
-					slot.background.setStrokeStyle(strokeWidth + 1, COLORS.itemSlotStroke);
-				});
-
-				slot.background.on('pointerout', () => {
-					slot.background.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
-				});
-			} else {
-				// 沒有道具，恢復空格顏色
-				slot.background.setFillStyle(COLORS.itemSlot);
-			}
+		for (const slot of this.itemSlots) {
+			slot.background.destroy();
+			if (slot.text) slot.text.destroy();
 		}
-	}
-
-	/**
-	 * 初始化玩家和敵人的角色狀態
-	 */
-	private initializeStats() {
-		// 取得遊戲狀態
-		this.gameState = GameState.getInstance();
-
-		// 玩家狀態從 GameState 取得（跨場景保留）
-		this.playerStats = this.gameState.playerStats;
-
-		// 取得當前關卡配置
-		const stageConfig = this.gameState.currentStageConfig;
-		const enemyConfig = stageConfig.enemies[0]; // 目前只處理第一個敵人
-
-		// 儲存敵人名稱
-		this.currentEnemyName = enemyConfig.name;
-
-		// 敵人：使用關卡配置的屬性
-		this.enemyStats = new CharacterStats(
-			enemyConfig.attributes || {}, // 使用配置的主屬性
-			{}, // 不使用舊的裝備加成系統
-			{
-				weapon: enemyConfig.weapon ? WEAPONS[enemyConfig.weapon] : createDefaultWeapon(),
-				armor: enemyConfig.armor ? ARMORS[enemyConfig.armor] : createDefaultArmor(),
-				items: [], // 敵人無道具
-				maxItemSlots: 0 // 敵人無道具欄位
-			}
-		);
-
-		// 輸出狀態到控制台供測試
-		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
-		console.log(`[遊戲] ${currentMapLevel}級地圖 第${currentStage}關（${currentStageNumber}/15）`);
-		console.log(`[關卡] ${stageConfig.id}: ${stageConfig.name}`);
-		console.log(`[敵人] ${enemyConfig.name}`);
-
-		console.log('Player Stats:', {
-			primary: this.playerStats.primary,
-			weapon: this.playerStats.weapon?.name,
-			armor: this.playerStats.armor?.name,
-			items: this.playerStats.items.map((i) => i.name),
-			derived: this.playerStats.derived,
-			currentHealth: this.playerStats.currentHealth,
-			currentMana: this.playerStats.currentMana
-		});
-
-		console.log('Enemy Stats:', {
-			primary: this.enemyStats.primary,
-			weapon: this.enemyStats.weapon?.name,
-			armor: this.enemyStats.armor?.name,
-			derived: this.enemyStats.derived,
-			currentHealth: this.enemyStats.currentHealth,
-			currentMana: this.enemyStats.currentMana
-		});
+		this.createItemSlots();
 	}
 
 	/**
@@ -580,21 +557,38 @@ export class MainScene extends Phaser.Scene {
 	 */
 	private createUI() {
 		const { width, height, padding, strokeWidth, fontSize } = UI_BUTTON;
+		const stageConfig = this.gameState.currentStageConfig;
 
-		// 關卡資訊（頂部）
-		const { currentMapLevel, currentStage, currentStageNumber, currentStageConfig } = this.gameState;
+		// 關卡資訊（頂部）- 使用整數位置和較大字體減少模糊
+		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
 		this.stageInfoText = this.add.text(
-			GAME_WIDTH / 2,
-			15,
-			`${currentMapLevel}級 - ${currentStage}/3（${currentStageNumber}/15）${currentStageConfig.name}`,
-			{
-				fontSize: '12px',
-				color: '#aaaaaa',
-				fontFamily: 'Arial'
-			}
+			Math.floor(GAME_WIDTH / 2),
+			10,
+			`${currentMapLevel}級 - ${currentStage}/3（${currentStageNumber}/15）${stageConfig.name}`,
+			{ fontSize: '12px', color: '#cccccc', fontFamily: 'Arial' }
 		);
-		this.stageInfoText.setOrigin(0.5);
+		this.stageInfoText.setOrigin(0.5, 0);
 		this.stageInfoText.setDepth(50);
+
+		// 波次資訊
+		this.waveInfoText = this.add.text(Math.floor(GAME_WIDTH / 2), 26, '', {
+			fontSize: '11px',
+			color: '#88aaff',
+			fontFamily: 'Arial'
+		});
+		this.waveInfoText.setOrigin(0.5, 0);
+		this.waveInfoText.setDepth(50);
+
+		// 勝利條件
+		this.winConditionText = this.add.text(Math.floor(GAME_WIDTH / 2), 40, '', {
+			fontSize: '11px',
+			color: '#ffaa88',
+			fontFamily: 'Arial'
+		});
+		this.winConditionText.setOrigin(0.5, 0);
+		this.winConditionText.setDepth(50);
+
+		this.updateWaveInfo();
 
 		// 按鈕位置（左下角）
 		const buttonX = padding + width / 2;
@@ -621,26 +615,44 @@ export class MainScene extends Phaser.Scene {
 		});
 		this.turnText.setOrigin(1, 0.5);
 
-		// 按鈕互動效果
-		button.on('pointerover', () => {
-			button.setFillStyle(COLORS.buttonHover);
-		});
+		// 按鈕互動
+		button.on('pointerover', () => button.setFillStyle(COLORS.buttonHover));
+		button.on('pointerout', () => button.setFillStyle(COLORS.button));
+		button.on('pointerdown', () => this.nextTurn());
+	}
 
-		button.on('pointerout', () => {
-			button.setFillStyle(COLORS.button);
-		});
+	/**
+	 * 更新波次資訊
+	 */
+	private updateWaveInfo() {
+		const stageConfig = this.gameState.currentStageConfig;
+		const wave = stageConfig.waves[this.currentWaveIndex];
 
-		button.on('pointerdown', () => {
-			this.nextTurn();
-		});
+		this.waveInfoText.setText(`波次 ${this.currentWaveIndex + 1}/${stageConfig.waves.length}`);
+		this.winConditionText.setText(`目標: ${this.getWinConditionText(wave.winCondition)}`);
+	}
+
+	/**
+	 * 取得勝利條件文字
+	 */
+	private getWinConditionText(condition: WinCondition): string {
+		switch (condition.type) {
+			case 'annihilation':
+				return '消滅所有敵人';
+			case 'survive':
+				return `存活 ${condition.rounds} 回合`;
+			case 'target':
+				return '擊敗目標敵人';
+			default:
+				return '未知';
+		}
 	}
 
 	/**
 	 * 執行下一回合
 	 */
 	private nextTurn() {
-		// 檢查遊戲是否已結束
-		if (!this.playerStats.isAlive || !this.enemyStats.isAlive) {
+		if (!this.playerStats.isAlive) {
 			console.log('遊戲已結束，無法繼續回合');
 			return;
 		}
@@ -650,17 +662,17 @@ export class MainScene extends Phaser.Scene {
 
 		console.log(`\n========== 回合 ${this.turnCount} ==========`);
 
-		// 回合開始：玩家攻擊敵人
+		// 玩家攻擊選中的敵人
 		this.playerAttack();
 
-		// 檢查敵人是否存活
-		if (!this.enemyStats.isAlive) {
-			this.onEnemyDefeated();
+		// 檢查勝利條件
+		if (this.checkWinCondition()) {
+			this.onWaveComplete();
 			return;
 		}
 
-		// 回合結束：敵人攻擊玩家
-		this.enemyAttack();
+		// 敵人攻擊
+		this.enemiesAttack();
 
 		// 檢查玩家是否存活
 		if (!this.playerStats.isAlive) {
@@ -668,104 +680,247 @@ export class MainScene extends Phaser.Scene {
 			return;
 		}
 
-		// 回合結束：雙方回復
+		// 回合結束回復
 		this.applyEndOfTurnEffects();
 	}
 
 	/**
-	 * 玩家攻擊敵人
+	 * 玩家攻擊
 	 */
 	private playerAttack() {
-		const attacker = this.playerStats;
-		const defender = this.enemyStats;
+		const enemy = this.enemies[this.selectedEnemyIndex];
+		if (!enemy || !enemy.isAlive) {
+			// 找一個活著的敵人
+			const aliveIndex = this.enemies.findIndex((e) => e.isAlive);
+			if (aliveIndex === -1) return;
+			this.selectedEnemyIndex = aliveIndex;
+		}
 
-		// 使用近距離攻擊力
-		let damage = attacker.derived.meleeAttack;
+		const target = this.enemies[this.selectedEnemyIndex];
+		if (!target || !target.isAlive) return;
+
+		let damage = this.playerStats.derived.meleeAttack;
 		let isCritical = false;
 
-		// 判定暴擊
-		if (attacker.rollCritical()) {
-			damage = attacker.calculateCriticalDamage(damage);
+		if (this.playerStats.rollCritical()) {
+			damage = this.playerStats.calculateCriticalDamage(damage);
 			isCritical = true;
 		}
 
-		// 造成傷害
-		const actualDamage = defender.takeDamage(damage);
-
-		// 更新敵人血量條
-		this.updateHealthBar(this.enemyHealthBar, this.enemyStats);
-
-		// 閃爍效果
-		this.flashEffect(this.enemy, 0xffffff);
+		const actualDamage = target.stats.takeDamage(damage);
+		this.updateHealthBar(target.healthBar, target.stats);
+		this.flashEffect(target.gameObject, 0xffffff);
 
 		console.log(
-			`[玩家攻擊] ${isCritical ? '💥暴擊！' : ''} 傷害: ${damage.toFixed(1)} → 實際: ${actualDamage.toFixed(1)} | 敵人血量: ${defender.currentHealth.toFixed(1)}/${defender.derived.healthPoints}`
+			`[玩家攻擊] ${target.instance.name} ${isCritical ? '💥暴擊！' : ''} 傷害: ${damage.toFixed(1)} → 實際: ${actualDamage.toFixed(1)}`
 		);
+
+		// 檢查敵人是否死亡
+		if (!target.stats.isAlive) {
+			this.onEnemyDefeated(this.selectedEnemyIndex);
+		}
 	}
 
 	/**
-	 * 敵人攻擊玩家
+	 * 敵人攻擊
 	 */
-	private enemyAttack() {
-		const attacker = this.enemyStats;
-		const defender = this.playerStats;
+	private enemiesAttack() {
+		for (const enemy of this.enemies) {
+			if (!enemy.isAlive) continue;
 
-		// 使用近距離攻擊力
-		let damage = attacker.derived.meleeAttack;
-		let isCritical = false;
+			let damage = enemy.stats.derived.meleeAttack;
+			let isCritical = false;
 
-		// 判定暴擊
-		if (attacker.rollCritical()) {
-			damage = attacker.calculateCriticalDamage(damage);
-			isCritical = true;
+			if (enemy.stats.rollCritical()) {
+				damage = enemy.stats.calculateCriticalDamage(damage);
+				isCritical = true;
+			}
+
+			const actualDamage = this.playerStats.takeDamage(damage);
+			this.updateHealthBar(this.playerHealthBar, this.playerStats);
+			this.flashEffect(this.player, 0xff0000);
+
+			console.log(
+				`[${enemy.instance.name}攻擊] ${isCritical ? '💥暴擊！' : ''} 傷害: ${damage.toFixed(1)} → 實際: ${actualDamage.toFixed(1)}`
+			);
+
+			if (!this.playerStats.isAlive) break;
 		}
-
-		// 造成傷害
-		const actualDamage = defender.takeDamage(damage);
-
-		// 更新玩家血量條
-		this.updateHealthBar(this.playerHealthBar, this.playerStats);
-
-		// 閃爍效果
-		this.flashEffect(this.player, 0xff0000);
-
-		console.log(
-			`[敵人攻擊] ${isCritical ? '💥暴擊！' : ''} 傷害: ${damage.toFixed(1)} → 實際: ${actualDamage.toFixed(1)} | 玩家血量: ${defender.currentHealth.toFixed(1)}/${defender.derived.healthPoints}`
-		);
 	}
 
 	/**
-	 * 回合結束效果（回復）
+	 * 回合結束效果
 	 */
 	private applyEndOfTurnEffects() {
 		this.playerStats.applyRegeneration();
-		this.enemyStats.applyRegeneration();
-
-		// 更新血量條（回復後）
 		this.updateHealthBar(this.playerHealthBar, this.playerStats);
-		this.updateHealthBar(this.enemyHealthBar, this.enemyStats);
 
-		console.log('[回合結束] 雙方回復');
-		console.log(
-			`  玩家: HP ${this.playerStats.currentHealth.toFixed(1)}/${this.playerStats.derived.healthPoints} | MP ${this.playerStats.currentMana.toFixed(1)}/${this.playerStats.derived.manaPoints}`
+		for (const enemy of this.enemies) {
+			if (enemy.isAlive) {
+				enemy.stats.applyRegeneration();
+				this.updateHealthBar(enemy.healthBar, enemy.stats);
+			}
+		}
+
+		console.log(`[回合結束] 玩家血量: ${this.playerStats.currentHealth.toFixed(1)}/${this.playerStats.derived.healthPoints}`);
+	}
+
+	/**
+	 * 檢查勝利條件
+	 */
+	private checkWinCondition(): boolean {
+		const wave = this.gameState.currentStageConfig.waves[this.currentWaveIndex];
+		const condition = wave.winCondition;
+
+		if (condition.type === 'annihilation') {
+			return this.enemies.every((e) => !e.isAlive);
+		}
+
+		if (condition.type === 'survive') {
+			return this.turnCount >= condition.rounds;
+		}
+
+		if (condition.type === 'target') {
+			const targetEnemy = this.enemies.find(
+				(e) => e.instance.instanceId === condition.targetId
+			);
+			return targetEnemy ? !targetEnemy.isAlive : false;
+		}
+
+		return false;
+	}
+
+	/**
+	 * 敵人被擊敗
+	 */
+	private onEnemyDefeated(index: number) {
+		const enemy = this.enemies[index];
+		enemy.isAlive = false;
+		enemy.gameObject.setVisible(false);
+		enemy.gameObject.disableInteractive();
+		enemy.healthBar.background.setVisible(false);
+		enemy.healthBar.fill.setVisible(false);
+
+		// 獲得點數
+		const points = enemy.instance.pointReward;
+		this.gameState.addPoints(points);
+
+		console.log(`🎉 ${enemy.instance.name} 被擊敗！獲得 ${points} 點數`);
+
+		// 關閉抽屜
+		this.closeDrawer();
+
+		// 選擇下一個活著的敵人
+		const nextAlive = this.enemies.findIndex((e) => e.isAlive);
+		if (nextAlive !== -1) {
+			this.selectedEnemyIndex = nextAlive;
+			this.highlightSelectedEnemy();
+		}
+	}
+
+	/**
+	 * 波次完成
+	 */
+	private onWaveComplete() {
+		const stageConfig = this.gameState.currentStageConfig;
+		const wave = stageConfig.waves[this.currentWaveIndex];
+
+		// 獲得波次獎勵
+		this.gameState.addPoints(wave.reward.points);
+		console.log(`🎉 波次完成！獲得 ${wave.reward.points} 點數獎勵`);
+
+		// 檢查是否還有下一波
+		if (this.currentWaveIndex < stageConfig.waves.length - 1) {
+			// 下一波
+			this.currentWaveIndex++;
+
+			// 顯示波次完成訊息
+			const waveText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '波次完成！', {
+				fontSize: '24px',
+				color: '#00ff00',
+				fontFamily: 'Arial',
+				fontStyle: 'bold'
+			});
+			waveText.setOrigin(0.5);
+			waveText.setDepth(100);
+
+			this.time.delayedCall(1000, () => {
+				waveText.destroy();
+				this.spawnWave();
+			});
+		} else {
+			// 關卡完成
+			this.onStageComplete();
+		}
+	}
+
+	/**
+	 * 關卡完成
+	 */
+	private onStageComplete() {
+		console.log('🎉 關卡完成！');
+
+		// 顯示勝利訊息
+		const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '關卡通關！', {
+			fontSize: '32px',
+			color: '#00ff00',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+		victoryText.setOrigin(0.5);
+		victoryText.setDepth(100);
+
+		// 顯示獲得的點數
+		const totalPoints = this.gameState.points;
+		const pointsText = this.add.text(
+			GAME_WIDTH / 2,
+			GAME_HEIGHT / 2 + 40,
+			`總點數: ${totalPoints}`,
+			{
+				fontSize: '18px',
+				color: '#ffcc00',
+				fontFamily: 'Arial'
+			}
 		);
-		console.log(
-			`  敵人: HP ${this.enemyStats.currentHealth.toFixed(1)}/${this.enemyStats.derived.healthPoints} | MP ${this.enemyStats.currentMana.toFixed(1)}/${this.enemyStats.derived.manaPoints}`
-		);
+		pointsText.setOrigin(0.5);
+		pointsText.setDepth(100);
+
+		// 延遲後進入補給場景
+		this.time.delayedCall(2000, () => {
+			this.scene.start('SupplyScene');
+		});
+	}
+
+	/**
+	 * 玩家被擊敗
+	 */
+	private onPlayerDefeated() {
+		console.log('💀 玩家被擊敗！遊戲結束');
+		this.player.setTint(0x555555);
+
+		const gameOverText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '遊戲結束', {
+			fontSize: '32px',
+			color: '#ff0000',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+		gameOverText.setOrigin(0.5);
+		gameOverText.setDepth(100);
 	}
 
 	/**
 	 * 閃爍效果
 	 */
-	private flashEffect(target: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite, color: number) {
+	private flashEffect(
+		target: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite,
+		color: number
+	) {
 		if (target instanceof Phaser.GameObjects.Sprite) {
-			// Sprite 使用 tint
 			target.setTint(color);
 			this.time.delayedCall(100, () => {
 				target.clearTint();
 			});
 		} else {
-			// Rectangle 使用 fillStyle
 			const originalColor = target.fillColor;
 			target.setFillStyle(color);
 			this.time.delayedCall(100, () => {
@@ -775,13 +930,36 @@ export class MainScene extends Phaser.Scene {
 	}
 
 	/**
+	 * 設置角色互動
+	 */
+	private setupCharacterInteraction() {
+		// 玩家互動
+		this.player.setInteractive({ useHandCursor: true });
+		this.player.on('pointerdown', () => {
+			this.clickedOnCharacter = true;
+			this.openDrawer('玩家', this.playerStats);
+		});
+
+		// 背景點擊關閉抽屜
+		this.input.on('pointerdown', () => {
+			this.time.delayedCall(10, () => {
+				if (!this.clickedOnCharacter && this.isDrawerOpen) {
+					this.closeDrawer();
+				}
+				this.clickedOnCharacter = false;
+			});
+		});
+	}
+
+	/**
 	 * 建立資訊抽屜
 	 */
 	private createInfoDrawer() {
-		const { height, padding, fontSize, titleFontSize, backgroundColor, borderColor } = INFO_DRAWER;
+		const { height, backgroundColor, borderColor, padding } = INFO_DRAWER;
 
-		// 建立容器（初始位置在畫面上方外側）
+		// 建立容器
 		const container = this.add.container(0, -height);
+		container.setDepth(200);
 
 		// 背景
 		const background = this.add.rectangle(
@@ -792,83 +970,75 @@ export class MainScene extends Phaser.Scene {
 			backgroundColor
 		);
 		background.setStrokeStyle(2, borderColor);
+		container.add(background);
 
-		// 名稱文字
-		const nameText = this.add.text(padding, padding, '敵人', {
-			fontSize: `${titleFontSize}px`,
-			color: INFO_DRAWER.textColor,
-			fontFamily: 'Arial',
-			fontStyle: 'bold'
-		});
+		// 文字元素
+		const nameText = this.add
+			.text(padding, padding, '', {
+				fontSize: '14px',
+				color: '#ffffff',
+				fontFamily: 'Arial',
+				fontStyle: 'bold'
+			})
+			.setDepth(201);
+		container.add(nameText);
 
-		// 血量文字
-		const healthText = this.add.text(padding, padding + 24, 'HP: 100/100', {
-			fontSize: `${fontSize}px`,
-			color: INFO_DRAWER.textColor,
-			fontFamily: 'Arial'
-		});
-
-		// 六屬性文字（分兩列，調整位置）
-		const statsTexts: Phaser.GameObjects.Text[] = [];
-		const attributes = [
-			{ label: '力量', key: 'strength' },
-			{ label: '敏捷', key: 'agility' },
-			{ label: '體力', key: 'vitality' },
-			{ label: '智力', key: 'intelligence' },
-			{ label: '意志', key: 'willpower' },
-			{ label: '幸運', key: 'luck' }
-		];
-
-		const col1X = padding;
-		const col2X = GAME_WIDTH / 2 + padding;
-		const startY = padding + 42;
-		const lineHeight = 18;
-
-		attributes.forEach((attr, index) => {
-			const col = index < 3 ? col1X : col2X;
-			const row = index % 3;
-			const text = this.add.text(col, startY + row * lineHeight, `${attr.label}: 10`, {
-				fontSize: `${fontSize}px`,
-				color: INFO_DRAWER.labelColor,
+		const healthText = this.add
+			.text(padding, padding + 22, '', {
+				fontSize: '12px',
+				color: '#ffffff',
 				fontFamily: 'Arial'
-			});
+			})
+			.setDepth(201);
+		container.add(healthText);
+
+		const statsTexts: Phaser.GameObjects.Text[] = [];
+		const statsY = padding + 44;
+		const statNames = ['力量', '敏捷', '體力', '智力', '意志', '幸運'];
+
+		for (let i = 0; i < 6; i++) {
+			const col = i < 3 ? 0 : 1;
+			const row = i % 3;
+			const x = padding + col * 100;
+			const y = statsY + row * 18;
+			const text = this.add
+				.text(x, y, `${statNames[i]}: --`, {
+					fontSize: '11px',
+					color: '#aaaaaa',
+					fontFamily: 'Arial'
+				})
+				.setDepth(201);
+			container.add(text);
 			statsTexts.push(text);
-		});
+		}
 
-		// 裝備文字
-		const equipmentY = startY + 3 * lineHeight + 8;
-		const weaponText = this.add.text(padding, equipmentY, '武器: 無', {
-			fontSize: `${fontSize}px`,
-			color: INFO_DRAWER.equipmentColor,
-			fontFamily: 'Arial'
-		});
+		const equipY = statsY + 60;
+		const weaponText = this.add
+			.text(padding, equipY, '', {
+				fontSize: '11px',
+				color: '#4a9eff',
+				fontFamily: 'Arial'
+			})
+			.setDepth(201);
+		container.add(weaponText);
 
-		const armorText = this.add.text(padding, equipmentY + 16, '防具: 無', {
-			fontSize: `${fontSize}px`,
-			color: INFO_DRAWER.equipmentColor,
-			fontFamily: 'Arial'
-		});
+		const armorText = this.add
+			.text(padding, equipY + 18, '', {
+				fontSize: '11px',
+				color: '#4a9eff',
+				fontFamily: 'Arial'
+			})
+			.setDepth(201);
+		container.add(armorText);
 
-		// 道具文字
-		const itemsText = this.add.text(padding, equipmentY + 32, '道具: 無', {
-			fontSize: `${fontSize}px`,
-			color: INFO_DRAWER.equipmentColor,
-			fontFamily: 'Arial'
-		});
-
-		// 將所有元素加入容器
-		container.add([
-			background,
-			nameText,
-			healthText,
-			...statsTexts,
-			weaponText,
-			armorText,
-			itemsText
-		]);
-
-		// 設置深度，確保在最上層
-		container.setDepth(100);
+		const itemsText = this.add
+			.text(padding, equipY + 36, '', {
+				fontSize: '11px',
+				color: '#4a9eff',
+				fontFamily: 'Arial'
+			})
+			.setDepth(201);
+		container.add(itemsText);
 
 		this.infoDrawer = {
 			container,
@@ -883,163 +1053,66 @@ export class MainScene extends Phaser.Scene {
 	}
 
 	/**
-	 * 設置角色點擊事件（玩家和敵人）
+	 * 開啟資訊抽屜
 	 */
-	private setupCharacterInteraction() {
-		// 敵人點擊事件
-		this.enemy.setInteractive({ useHandCursor: true });
-		this.enemy.on('pointerdown', () => {
-			console.log('敵人被點擊');
-			this.clickedOnCharacter = true;
-			this.openDrawer(this.enemyStats, this.currentEnemyName);
-		});
+	private openDrawer(name: string, stats: CharacterStats) {
+		this.updateDrawerContent(name, stats);
 
-		// 玩家點擊事件
-		this.player.setInteractive({ useHandCursor: true });
-		this.player.on('pointerdown', () => {
-			console.log('玩家被點擊');
-			this.clickedOnCharacter = true;
-			this.openDrawer(this.playerStats, '玩家');
-		});
-	}
-
-	/**
-	 * 設置點擊背景關閉抽屜
-	 */
-	private setupBackgroundClick() {
-		this.input.on('pointerdown', () => {
-			// 延遲檢查，讓角色的點擊事件先執行
-			this.time.delayedCall(10, () => {
-				if (this.clickedOnCharacter) {
-					this.clickedOnCharacter = false;
-					return;
-				}
-				if (this.isDrawerOpen) {
-					console.log('關閉抽屜');
-					this.closeDrawer();
-				}
+		if (!this.isDrawerOpen) {
+			this.tweens.add({
+				targets: this.infoDrawer.container,
+				y: 0,
+				duration: 200,
+				ease: 'Power2'
 			});
-		});
-	}
-
-	/**
-	 * 開啟抽屜並顯示角色資訊
-	 */
-	private openDrawer(stats: CharacterStats, name: string) {
-		if (this.isDrawerOpen) {
-			// 如果已開啟，先關閉再開啟（更新內容）
-			this.updateDrawerContent(stats, name);
-			return;
+			this.isDrawerOpen = true;
 		}
-
-		this.isDrawerOpen = true;
-
-		// 更新抽屜內容
-		this.updateDrawerContent(stats, name);
-
-		// 滑入動畫
-		this.tweens.add({
-			targets: this.infoDrawer.container,
-			y: 0,
-			duration: INFO_DRAWER.animationDuration,
-			ease: 'Power2'
-		});
 	}
 
 	/**
-	 * 關閉抽屜
+	 * 關閉資訊抽屜
 	 */
 	private closeDrawer() {
-		if (!this.isDrawerOpen) return;
-
-		this.isDrawerOpen = false;
-
-		// 滑出動畫
-		this.tweens.add({
-			targets: this.infoDrawer.container,
-			y: -INFO_DRAWER.height,
-			duration: INFO_DRAWER.animationDuration,
-			ease: 'Power2'
-		});
+		if (this.isDrawerOpen) {
+			this.tweens.add({
+				targets: this.infoDrawer.container,
+				y: -INFO_DRAWER.height,
+				duration: 200,
+				ease: 'Power2'
+			});
+			this.isDrawerOpen = false;
+		}
 	}
 
 	/**
 	 * 更新抽屜內容
 	 */
-	private updateDrawerContent(stats: CharacterStats, name: string) {
-		const { primary, derived } = stats;
-
-		// 更新名稱
+	private updateDrawerContent(name: string, stats: CharacterStats) {
 		this.infoDrawer.nameText.setText(name);
-
-		// 更新血量
 		this.infoDrawer.healthText.setText(
-			`HP: ${stats.currentHealth.toFixed(0)}/${derived.healthPoints}`
+			`HP: ${stats.currentHealth.toFixed(0)}/${stats.derived.healthPoints} | MP: ${stats.currentMana.toFixed(0)}/${stats.derived.manaPoints}`
 		);
 
-		// 更新六屬性
-		const attributes = [
-			{ label: '力量', value: primary.strength },
-			{ label: '敏捷', value: primary.agility },
-			{ label: '體力', value: primary.vitality },
-			{ label: '智力', value: primary.intelligence },
-			{ label: '意志', value: primary.willpower },
-			{ label: '幸運', value: primary.luck }
-		];
+		const primary = stats.primary;
+		this.infoDrawer.statsTexts[0].setText(`力量: ${primary.strength}`);
+		this.infoDrawer.statsTexts[1].setText(`敏捷: ${primary.agility}`);
+		this.infoDrawer.statsTexts[2].setText(`體力: ${primary.vitality}`);
+		this.infoDrawer.statsTexts[3].setText(`智力: ${primary.intelligence}`);
+		this.infoDrawer.statsTexts[4].setText(`意志: ${primary.willpower}`);
+		this.infoDrawer.statsTexts[5].setText(`幸運: ${primary.luck}`);
 
-		attributes.forEach((attr, index) => {
-			this.infoDrawer.statsTexts[index].setText(`${attr.label}: ${attr.value}`);
-		});
+		this.infoDrawer.weaponText.setText(
+			`武器: ${stats.weapon?.name || '無'} (+${stats.weapon?.attack || 0})`
+		);
+		this.infoDrawer.armorText.setText(
+			`防具: ${stats.armor?.name || '無'} (+${stats.armor?.defense || 0})`
+		);
 
-		// 更新裝備資訊
-		const weaponName = stats.weapon ? `${stats.weapon.name} (+${stats.weapon.attack})` : '無';
-		this.infoDrawer.weaponText.setText(`武器: ${weaponName}`);
-
-		const armorName = stats.armor ? `${stats.armor.name} (+${stats.armor.defense})` : '無';
-		this.infoDrawer.armorText.setText(`防具: ${armorName}`);
-
-		// 更新道具資訊
 		if (stats.items.length > 0) {
 			const itemNames = stats.items.map((item) => item.name).join(', ');
 			this.infoDrawer.itemsText.setText(`道具: ${itemNames} (${stats.items.length}/${stats.maxItemSlots})`);
 		} else {
 			this.infoDrawer.itemsText.setText(`道具: 無 (0/${stats.maxItemSlots})`);
 		}
-	}
-
-	/**
-	 * 敵人被擊敗
-	 */
-	private onEnemyDefeated() {
-		console.log('🎉 敵人被擊敗！');
-		this.enemy.setVisible(false);
-		this.enemy.disableInteractive(); // 禁用互動
-		this.enemyHealthBar.background.setVisible(false);
-		this.enemyHealthBar.fill.setVisible(false);
-		this.closeDrawer(); // 關閉抽屜
-
-		// 顯示勝利訊息
-		const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '勝利！', {
-			fontSize: '32px',
-			color: '#00ff00',
-			fontFamily: 'Arial',
-			fontStyle: 'bold'
-		});
-		victoryText.setOrigin(0.5);
-		victoryText.setDepth(100);
-
-		// 延遲後進入補給場景
-		this.time.delayedCall(1500, () => {
-			this.scene.start('SupplyScene');
-		});
-	}
-
-	/**
-	 * 玩家被擊敗
-	 */
-	private onPlayerDefeated() {
-		console.log('💀 玩家被擊敗！遊戲結束');
-		// 將玩家變灰色表示死亡
-		this.player.setTint(0x555555);
 	}
 }

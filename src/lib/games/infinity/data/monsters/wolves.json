@@ -1,0 +1,50 @@
+[
+	{
+		"id": "wolf_grey",
+		"name": "灰狼",
+		"color": "0x696969",
+		"baseAttributes": {
+			"strength": 11,
+			"vitality": 9,
+			"agility": 13,
+			"intelligence": 4,
+			"willpower": 6,
+			"luck": 7
+		},
+		"weapon": "wooden_sword",
+		"armor": "cloth_armor",
+		"basePointReward": 400
+	},
+	{
+		"id": "wolf_black",
+		"name": "黑狼",
+		"color": "0x2a2a2a",
+		"baseAttributes": {
+			"strength": 13,
+			"vitality": 10,
+			"agility": 15,
+			"intelligence": 5,
+			"willpower": 7,
+			"luck": 9
+		},
+		"weapon": "iron_sword",
+		"armor": "leather",
+		"basePointReward": 500
+	},
+	{
+		"id": "wolf_alpha",
+		"name": "狼王",
+		"color": "0x1a1a1a",
+		"baseAttributes": {
+			"strength": 16,
+			"vitality": 14,
+			"agility": 18,
+			"intelligence": 8,
+			"willpower": 10,
+			"luck": 12
+		},
+		"weapon": "steel_sword",
+		"armor": "leather",
+		"basePointReward": 1600
+	}
+]

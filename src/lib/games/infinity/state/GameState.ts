@@ -5,6 +5,14 @@
 import { CharacterStats, createDefaultWeapon, createDefaultArmor, ITEMS, ItemType } from '../entities';
 import { getRandomStage } from '../data';
 import type { StageConfig } from '../data';
+import {
+	TIER_ORDER,
+	STAGES_TO_PROMOTE,
+	POTION_PRICES,
+	EQUIPMENT_PRICES,
+	getAttributeUpgradeCost
+} from '../data/constants';
+import type { Tier } from '../data/constants';
 
 /**
  * 地圖等級
@@ -29,14 +37,14 @@ export const MAP_LEVEL_ORDER: MapLevel[] = [
 ];
 
 /**
- * 每個地圖等級的關卡數
+ * 每個地圖等級的關卡數（改為無限，用晉級系統）
  */
 export const STAGES_PER_MAP = 3;
 
 /**
- * 總關卡數
+ * 總關卡數（用於顯示，實際可無限）
  */
-export const TOTAL_STAGES = MAP_LEVEL_ORDER.length * STAGES_PER_MAP; // 15
+export const TOTAL_STAGES = MAP_LEVEL_ORDER.length * STAGES_PER_MAP;
 
 /**
  * 根據地圖等級取得可購買的血瓶類型
@@ -44,7 +52,6 @@ export const TOTAL_STAGES = MAP_LEVEL_ORDER.length * STAGES_PER_MAP; // 15
 export function getAvailablePotions(mapLevel: MapLevel): ItemType[] {
 	const potions: ItemType[] = [];
 
-	// D級以上都可以買 D級血瓶
 	potions.push(ItemType.HealthPotionD);
 
 	if (mapLevel === MapLevel.C || mapLevel === MapLevel.B || mapLevel === MapLevel.A || mapLevel === MapLevel.S) {
@@ -59,25 +66,32 @@ export function getAvailablePotions(mapLevel: MapLevel): ItemType[] {
 		potions.push(ItemType.HealthPotionA);
 	}
 
-	// S級地圖不開放 S級血瓶（目前沒有 S級血瓶）
-
 	return potions;
+}
+
+/**
+ * 取得血瓶價格
+ */
+export function getPotionPrice(itemType: ItemType): number {
+	const priceMap: Partial<Record<ItemType, Tier>> = {
+		[ItemType.HealthPotionD]: 'D',
+		[ItemType.HealthPotionC]: 'C',
+		[ItemType.HealthPotionB]: 'B',
+		[ItemType.HealthPotionA]: 'A'
+	};
+	const tier = priceMap[itemType];
+	return tier ? POTION_PRICES[tier] : 0;
 }
 
 /**
  * 遊戲狀態介面
  */
 export interface IGameState {
-	// 進度
 	currentMapLevel: MapLevel;
-	currentStage: number; // 1-3（當前地圖內的關卡）
-	totalStagesCleared: number; // 0-15
-
-	// 玩家狀態
+	currentStage: number;
+	totalStagesCleared: number;
 	playerStats: CharacterStats;
-
-	// 貨幣（未來擴充）
-	gold: number;
+	points: number;
 }
 
 /**
@@ -90,6 +104,7 @@ export class GameState {
 	public currentMapLevel: MapLevel = MapLevel.D;
 	public currentStage: number = 1;
 	public totalStagesCleared: number = 0;
+	public stagesClearedInCurrentLevel: number = 0;
 
 	// 當前關卡配置
 	public currentStageConfig: StageConfig;
@@ -97,13 +112,11 @@ export class GameState {
 	// 玩家狀態
 	public playerStats: CharacterStats;
 
-	// 貨幣
-	public gold: number = 0;
+	// 貨幣（點數）
+	public points: number = 0;
 
 	private constructor() {
-		// 初始化玩家狀態
 		this.playerStats = this.createInitialPlayerStats();
-		// 隨機選擇第一個關卡
 		this.currentStageConfig = getRandomStage(this.currentMapLevel);
 	}
 
@@ -129,48 +142,70 @@ export class GameState {
 	 */
 	private createInitialPlayerStats(): CharacterStats {
 		return new CharacterStats(
-			{}, // 使用預設主屬性
-			{}, // 不使用舊的裝備加成系統
+			{},
+			{},
 			{
-				weapon: createDefaultWeapon(), // 木劍 (+5 攻擊)
-				armor: createDefaultArmor(), // 布甲 (+1 防禦)
-				items: [ITEMS[ItemType.HealthPotionD]], // 初始 1 瓶 D 級血瓶
-				maxItemSlots: 1 // 初始道具欄位 1 格
+				weapon: createDefaultWeapon(),
+				armor: createDefaultArmor(),
+				items: [ITEMS[ItemType.HealthPotionD]],
+				maxItemSlots: 1
 			}
 		);
 	}
 
 	/**
+	 * 增加點數
+	 */
+	public addPoints(amount: number): void {
+		this.points += amount;
+		console.log(`[點數] +${amount}，目前: ${this.points}`);
+	}
+
+	/**
+	 * 消費點數
+	 * @returns 是否成功消費
+	 */
+	public spendPoints(amount: number): boolean {
+		if (this.points >= amount) {
+			this.points -= amount;
+			console.log(`[點數] -${amount}，目前: ${this.points}`);
+			return true;
+		}
+		console.log(`[點數] 不足！需要 ${amount}，目前: ${this.points}`);
+		return false;
+	}
+
+	/**
 	 * 進入下一關
-	 * @returns 是否成功進入下一關（false 表示遊戲結束）
+	 * @returns 是否成功進入下一關（false 表示遊戲通關）
 	 */
 	public nextStage(): boolean {
 		this.totalStagesCleared++;
-
-		if (this.totalStagesCleared >= TOTAL_STAGES) {
-			// 遊戲通關
-			return false;
-		}
-
+		this.stagesClearedInCurrentLevel++;
 		this.currentStage++;
 
-		// 如果當前地圖的關卡已經完成，進入下一個地圖等級
-		if (this.currentStage > STAGES_PER_MAP) {
-			this.currentStage = 1;
+		// 檢查是否可以晉級
+		if (this.stagesClearedInCurrentLevel >= STAGES_TO_PROMOTE) {
 			const currentIndex = MAP_LEVEL_ORDER.indexOf(this.currentMapLevel);
+
 			if (currentIndex < MAP_LEVEL_ORDER.length - 1) {
+				// 晉級到下一等級
 				this.currentMapLevel = MAP_LEVEL_ORDER[currentIndex + 1];
+				this.currentStage = 1;
+				this.stagesClearedInCurrentLevel = 0;
+				console.log(`🎉 晉級到 ${this.currentMapLevel} 級！`);
 			}
+			// S 級無限循環，不需要特殊處理
 		}
 
-		// 隨機選擇下一個關卡配置
+		// 選擇下一個關卡配置
 		this.currentStageConfig = getRandomStage(this.currentMapLevel);
 
 		return true;
 	}
 
 	/**
-	 * 取得當前關卡的總編號（1-15）
+	 * 取得當前關卡的總編號
 	 */
 	public get currentStageNumber(): number {
 		const mapIndex = MAP_LEVEL_ORDER.indexOf(this.currentMapLevel);
@@ -185,12 +220,27 @@ export class GameState {
 	}
 
 	/**
+	 * 取得道具欄擴充價格
+	 * 第一格（1→2）: 10000，第二格（2→3）: 20000
+	 */
+	public getItemSlotPrice(): number {
+		const currentSlots = this.playerStats.maxItemSlots;
+		if (currentSlots === 1) return 10000;
+		if (currentSlots === 2) return 20000;
+		return 0; // 已達上限
+	}
+
+	/**
 	 * 購買道具欄擴充
 	 * @returns 是否成功購買
 	 */
 	public buyItemSlot(): boolean {
 		if (this.playerStats.maxItemSlots >= 3) {
-			return false; // 已達上限
+			return false;
+		}
+		const price = this.getItemSlotPrice();
+		if (!this.spendPoints(price)) {
+			return false;
 		}
 		this.playerStats.maxItemSlots++;
 		return true;
@@ -198,40 +248,81 @@ export class GameState {
 
 	/**
 	 * 購買血瓶
-	 * @param potionType 血瓶類型
 	 * @returns 是否成功購買
 	 */
 	public buyPotion(potionType: ItemType): boolean {
-		// 檢查是否有空的道具欄
 		if (!this.playerStats.hasItemSpace) {
 			return false;
 		}
 
-		// 檢查是否為可購買的血瓶類型
 		if (!this.availablePotions.includes(potionType)) {
 			return false;
 		}
 
-		// 添加道具
+		const price = getPotionPrice(potionType);
+		if (!this.spendPoints(price)) {
+			return false;
+		}
+
 		return this.playerStats.addItem(ITEMS[potionType]);
 	}
 
 	/**
 	 * 出售道具
-	 * @param index 道具索引
 	 * @returns 是否成功出售
 	 */
 	public sellItem(index: number): boolean {
 		const item = this.playerStats.removeItem(index);
 		if (item) {
-			// 未來可以在這裡加入返還金幣的邏輯
+			// 返還一半價格
+			const price = getPotionPrice(item.type);
+			const sellPrice = Math.floor(price * 0.5);
+			this.addPoints(sellPrice);
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * 戰鬥後回復玩家狀態（可選，用於補給場景）
+	 * 升級屬性
+	 * @param attribute 屬性名稱
+	 * @returns 是否成功升級
+	 */
+	public upgradeAttribute(attribute: keyof typeof this.playerStats.primary): boolean {
+		const currentValue = this.playerStats.primary[attribute];
+
+		if (currentValue >= 250) {
+			console.log(`[屬性] ${attribute} 已達上限 250`);
+			return false;
+		}
+
+		const cost = getAttributeUpgradeCost(currentValue);
+		if (!this.spendPoints(cost)) {
+			return false;
+		}
+
+		this.playerStats.primary[attribute]++;
+		console.log(`[屬性] ${attribute} 升級至 ${this.playerStats.primary[attribute]}，花費 ${cost} 點`);
+
+		// 更新延伸屬性影響的當前值
+		if (attribute === 'vitality') {
+			// 體力影響血量，按比例調整
+			const oldMax = (currentValue) * 10;
+			const newMax = this.playerStats.derived.healthPoints;
+			this.playerStats.currentHealth = (this.playerStats.currentHealth / oldMax) * newMax;
+		}
+		if (attribute === 'intelligence') {
+			// 智力影響魔力，按比例調整
+			const oldMax = (currentValue) * 10;
+			const newMax = this.playerStats.derived.manaPoints;
+			this.playerStats.currentMana = (this.playerStats.currentMana / oldMax) * newMax;
+		}
+
+		return true;
+	}
+
+	/**
+	 * 戰鬥後回復玩家狀態
 	 */
 	public healPlayerToFull(): void {
 		this.playerStats.resetToMax();

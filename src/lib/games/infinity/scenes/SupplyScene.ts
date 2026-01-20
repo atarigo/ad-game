@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, SHOP, ITEM_SLOTS } from '../config';
-import { ITEMS, ItemType, type Item } from '../entities';
-import { GameState } from '../state';
+import { ITEMS, ItemType, type Item, type PrimaryAttributes } from '../entities';
+import { GameState, getPotionPrice } from '../state';
+import { getAttributeUpgradeCost } from '../data/constants';
 
 /**
  * 商品結構
@@ -33,6 +34,7 @@ export class SupplyScene extends Phaser.Scene {
 	private shopItems: ShopItem[] = [];
 	private inventorySlots: InventorySlot[] = [];
 	private stageText!: Phaser.GameObjects.Text;
+	private pointsText!: Phaser.GameObjects.Text;
 
 	constructor() {
 		super({ key: 'SupplyScene' });
@@ -56,6 +58,9 @@ export class SupplyScene extends Phaser.Scene {
 		// 道具欄區域
 		this.createInventory();
 
+		// 屬性升級區域
+		this.createAttributeUpgrade();
+
 		// 下一關按鈕
 		this.createNextButton();
 	}
@@ -64,11 +69,11 @@ export class SupplyScene extends Phaser.Scene {
 	 * 建立標題
 	 */
 	private createTitle() {
-		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
+		const { currentMapLevel, currentStage, currentStageNumber, points } = this.gameState;
 
 		// 標題
-		const title = this.add.text(GAME_WIDTH / 2, 30, '補給場景', {
-			fontSize: '24px',
+		const title = this.add.text(GAME_WIDTH / 2, 25, '補給場景', {
+			fontSize: '22px',
 			color: '#ffffff',
 			fontFamily: 'Arial',
 			fontStyle: 'bold'
@@ -78,15 +83,24 @@ export class SupplyScene extends Phaser.Scene {
 		// 關卡資訊
 		this.stageText = this.add.text(
 			GAME_WIDTH / 2,
-			60,
-			`${currentMapLevel}級地圖 - 第${currentStage}關（${currentStageNumber}/15）`,
+			50,
+			`${currentMapLevel}級地圖 - 第${currentStage}關（通關 ${this.gameState.stagesClearedInCurrentLevel}/3 可晉級）`,
 			{
-				fontSize: '14px',
+				fontSize: '12px',
 				color: '#aaaaaa',
 				fontFamily: 'Arial'
 			}
 		);
 		this.stageText.setOrigin(0.5);
+
+		// 點數顯示
+		this.pointsText = this.add.text(GAME_WIDTH / 2, 70, `點數: ${points}`, {
+			fontSize: '16px',
+			color: '#ffcc00',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+		this.pointsText.setOrigin(0.5);
 	}
 
 	/**
@@ -94,10 +108,10 @@ export class SupplyScene extends Phaser.Scene {
 	 */
 	private createShop() {
 		const { itemSize, itemGap, padding, fontSize, titleFontSize, priceColor } = SHOP;
-		const startY = 100;
+		const startY = 95;
 
 		// 商店標題
-		const shopTitle = this.add.text(padding, startY, '商店', {
+		this.add.text(padding, startY, '商店', {
 			fontSize: `${titleFontSize}px`,
 			color: '#ffffff',
 			fontFamily: 'Arial',
@@ -116,10 +130,11 @@ export class SupplyScene extends Phaser.Scene {
 		// 血瓶商品
 		for (const potionType of availablePotions) {
 			const item = ITEMS[potionType];
+			const price = getPotionPrice(potionType);
 			const x = padding + col * (itemSize + itemGap) + itemSize / 2;
-			const y = startY + 40 + row * (itemSize + itemGap + 20) + itemSize / 2;
+			const y = startY + 35 + row * (itemSize + itemGap + 20) + itemSize / 2;
 
-			this.createShopItem(x, y, 'potion', item, potionType);
+			this.createShopItem(x, y, 'potion', item, potionType, price);
 
 			col++;
 			if (col >= itemsPerRow) {
@@ -131,7 +146,7 @@ export class SupplyScene extends Phaser.Scene {
 		// 道具欄擴充商品
 		const canBuySlot = this.gameState.playerStats.maxItemSlots < 3;
 		const slotX = padding + col * (itemSize + itemGap) + itemSize / 2;
-		const slotY = startY + 40 + row * (itemSize + itemGap + 20) + itemSize / 2;
+		const slotY = startY + 35 + row * (itemSize + itemGap + 20) + itemSize / 2;
 
 		this.createSlotItem(slotX, slotY, canBuySlot);
 	}
@@ -139,9 +154,18 @@ export class SupplyScene extends Phaser.Scene {
 	/**
 	 * 建立商品格子
 	 */
-	private createShopItem(x: number, y: number, type: 'potion', item: Item, itemType: ItemType) {
+	private createShopItem(
+		x: number,
+		y: number,
+		type: 'potion',
+		item: Item,
+		itemType: ItemType,
+		price: number
+	) {
 		const { itemSize, fontSize, priceColor, disabledColor } = SHOP;
-		const canBuy = this.gameState.playerStats.hasItemSpace;
+		const hasSpace = this.gameState.playerStats.hasItemSpace;
+		const canAfford = this.gameState.points >= price;
+		const canBuy = hasSpace && canAfford;
 
 		// 背景
 		const background = this.add.rectangle(
@@ -156,15 +180,15 @@ export class SupplyScene extends Phaser.Scene {
 		// 商品名稱
 		const text = this.add.text(x, y - 10, item.name, {
 			fontSize: `${fontSize}px`,
-			color: '#ffffff',
+			color: canBuy ? '#ffffff' : '#888888',
 			fontFamily: 'Arial'
 		});
 		text.setOrigin(0.5);
 
 		// 價格
-		const priceText = this.add.text(x, y + 15, '$0', {
+		const priceText = this.add.text(x, y + 15, `$${price}`, {
 			fontSize: `${fontSize}px`,
-			color: priceColor,
+			color: canAfford ? priceColor : '#ff6666',
 			fontFamily: 'Arial'
 		});
 		priceText.setOrigin(0.5);
@@ -190,7 +214,7 @@ export class SupplyScene extends Phaser.Scene {
 			type: 'potion',
 			itemType,
 			name: item.name,
-			price: 0,
+			price,
 			background,
 			text,
 			priceText
@@ -202,6 +226,9 @@ export class SupplyScene extends Phaser.Scene {
 	 */
 	private createSlotItem(x: number, y: number, canBuy: boolean) {
 		const { itemSize, fontSize, priceColor, disabledColor } = SHOP;
+		const price = this.gameState.getItemSlotPrice();
+		const canAfford = this.gameState.points >= price;
+		const canPurchase = canBuy && canAfford;
 
 		// 背景
 		const background = this.add.rectangle(
@@ -209,28 +236,37 @@ export class SupplyScene extends Phaser.Scene {
 			y,
 			itemSize,
 			itemSize,
-			canBuy ? COLORS.button : disabledColor
+			canPurchase ? COLORS.button : disabledColor
 		);
 		background.setStrokeStyle(2, COLORS.buttonStroke);
 
 		// 商品名稱
 		const text = this.add.text(x, y - 10, '道具欄+1', {
 			fontSize: `${fontSize}px`,
-			color: '#ffffff',
+			color: canPurchase ? '#ffffff' : '#888888',
 			fontFamily: 'Arial'
 		});
 		text.setOrigin(0.5);
 
-		// 價格
-		const priceText = this.add.text(x, y + 15, '$0', {
+		// 價格或狀態
+		let statusText: string;
+		let statusColor: string;
+		if (!canBuy) {
+			statusText = '已滿';
+			statusColor = '#888888';
+		} else {
+			statusText = `$${price.toLocaleString()}`;
+			statusColor = canAfford ? priceColor : '#ff6666';
+		}
+		const priceText = this.add.text(x, y + 15, statusText, {
 			fontSize: `${fontSize}px`,
-			color: priceColor,
+			color: statusColor,
 			fontFamily: 'Arial'
 		});
 		priceText.setOrigin(0.5);
 
 		// 互動
-		if (canBuy) {
+		if (canPurchase) {
 			background.setInteractive({ useHandCursor: true });
 
 			background.on('pointerover', () => {
@@ -249,7 +285,7 @@ export class SupplyScene extends Phaser.Scene {
 		this.shopItems.push({
 			type: 'slot',
 			name: '道具欄+1',
-			price: 0,
+			price,
 			background,
 			text,
 			priceText
@@ -261,11 +297,11 @@ export class SupplyScene extends Phaser.Scene {
 	 */
 	private createInventory() {
 		const { size, gap, padding, strokeWidth } = ITEM_SLOTS;
-		const startY = 350;
+		const startY = 270;
 
 		// 道具欄標題
-		const inventoryTitle = this.add.text(padding, startY, '道具欄', {
-			fontSize: '18px',
+		this.add.text(padding, startY, '道具欄', {
+			fontSize: '16px',
 			color: '#ffffff',
 			fontFamily: 'Arial',
 			fontStyle: 'bold'
@@ -279,7 +315,7 @@ export class SupplyScene extends Phaser.Scene {
 
 		for (let i = 0; i < maxSlots; i++) {
 			const x = padding + i * (size + gap) + size / 2;
-			const y = startY + 50;
+			const y = startY + 40;
 
 			const hasItem = i < items.length;
 			const item = hasItem ? items[i] : null;
@@ -299,15 +335,16 @@ export class SupplyScene extends Phaser.Scene {
 			if (item) {
 				// 道具名稱
 				text = this.add.text(x, y - 5, item.name.charAt(0), {
-					fontSize: '16px',
+					fontSize: '14px',
 					color: '#ffffff',
 					fontFamily: 'Arial'
 				});
 				text.setOrigin(0.5);
 
-				// 賣出文字
-				const sellText = this.add.text(x, y + 12, '(賣)', {
-					fontSize: '10px',
+				// 賣出價格
+				const sellPrice = Math.floor(getPotionPrice(item.type) * 0.5);
+				const sellText = this.add.text(x, y + 12, `賣$${sellPrice}`, {
+					fontSize: '9px',
 					color: '#ff6666',
 					fontFamily: 'Arial'
 				});
@@ -338,49 +375,121 @@ export class SupplyScene extends Phaser.Scene {
 		}
 
 		// 顯示道具欄狀態
-		const statusText = this.add.text(
-			padding,
-			startY + 100,
-			`道具欄: ${items.length}/${maxSlots}`,
-			{
-				fontSize: '12px',
-				color: '#aaaaaa',
+		this.add.text(padding, startY + 85, `道具欄: ${items.length}/${maxSlots}`, {
+			fontSize: '11px',
+			color: '#aaaaaa',
+			fontFamily: 'Arial'
+		});
+	}
+
+	/**
+	 * 建立屬性升級區域
+	 */
+	private createAttributeUpgrade() {
+		const startY = 370;
+		const padding = SHOP.padding;
+
+		// 標題
+		this.add.text(padding, startY, '屬性升級', {
+			fontSize: '16px',
+			color: '#ffffff',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+
+		const attributes: Array<{
+			key: keyof PrimaryAttributes;
+			name: string;
+		}> = [
+			{ key: 'strength', name: '力量' },
+			{ key: 'vitality', name: '體力' },
+			{ key: 'agility', name: '敏捷' },
+			{ key: 'intelligence', name: '智力' },
+			{ key: 'willpower', name: '意志' },
+			{ key: 'luck', name: '幸運' }
+		];
+
+		const colWidth = 110;
+		const rowHeight = 35;
+
+		attributes.forEach((attr, index) => {
+			const col = index % 3;
+			const row = Math.floor(index / 3);
+			const x = padding + col * colWidth;
+			const y = startY + 30 + row * rowHeight;
+
+			const currentValue = this.gameState.playerStats.primary[attr.key];
+			const cost = getAttributeUpgradeCost(currentValue);
+			const canAfford = this.gameState.points >= cost;
+			const atMax = currentValue >= 250;
+
+			// 屬性名稱和數值
+			this.add.text(x, y, `${attr.name}: ${currentValue}`, {
+				fontSize: '11px',
+				color: '#ffffff',
 				fontFamily: 'Arial'
+			});
+
+			// 升級按鈕
+			if (!atMax) {
+				const btnX = x + 70;
+				const btnY = y + 6;
+				const btn = this.add.rectangle(btnX, btnY, 30, 16, canAfford ? COLORS.button : 0x444444);
+				btn.setStrokeStyle(1, canAfford ? COLORS.buttonStroke : 0x333333);
+
+				const btnText = this.add.text(btnX, btnY, '+1', {
+					fontSize: '9px',
+					color: canAfford ? '#ffffff' : '#666666',
+					fontFamily: 'Arial'
+				});
+				btnText.setOrigin(0.5);
+
+				// 價格
+				this.add.text(x, y + 16, `$${cost}`, {
+					fontSize: '9px',
+					color: canAfford ? '#ffcc00' : '#ff6666',
+					fontFamily: 'Arial'
+				});
+
+				if (canAfford) {
+					btn.setInteractive({ useHandCursor: true });
+					btn.on('pointerover', () => btn.setFillStyle(COLORS.buttonHover));
+					btn.on('pointerout', () => btn.setFillStyle(COLORS.button));
+					btn.on('pointerdown', () => this.upgradeAttribute(attr.key));
+				}
+			} else {
+				this.add.text(x, y + 16, 'MAX', {
+					fontSize: '9px',
+					color: '#888888',
+					fontFamily: 'Arial'
+				});
 			}
-		);
+		});
 	}
 
 	/**
 	 * 建立下一關按鈕
 	 */
 	private createNextButton() {
-		const buttonY = GAME_HEIGHT - 80;
+		const buttonY = GAME_HEIGHT - 50;
 
 		// 按鈕背景
-		const button = this.add.rectangle(GAME_WIDTH / 2, buttonY, 120, 50, COLORS.button);
+		const button = this.add.rectangle(GAME_WIDTH / 2, buttonY, 120, 40, COLORS.button);
 		button.setStrokeStyle(2, COLORS.buttonStroke);
 		button.setInteractive({ useHandCursor: true });
 
 		// 按鈕文字
 		const buttonText = this.add.text(GAME_WIDTH / 2, buttonY, '下一關', {
-			fontSize: '18px',
+			fontSize: '16px',
 			color: '#ffffff',
 			fontFamily: 'Arial'
 		});
 		buttonText.setOrigin(0.5);
 
 		// 互動效果
-		button.on('pointerover', () => {
-			button.setFillStyle(COLORS.buttonHover);
-		});
-
-		button.on('pointerout', () => {
-			button.setFillStyle(COLORS.button);
-		});
-
-		button.on('pointerdown', () => {
-			this.goToNextStage();
-		});
+		button.on('pointerover', () => button.setFillStyle(COLORS.buttonHover));
+		button.on('pointerout', () => button.setFillStyle(COLORS.button));
+		button.on('pointerdown', () => this.goToNextStage());
 	}
 
 	/**
@@ -393,7 +502,7 @@ export class SupplyScene extends Phaser.Scene {
 			console.log(`[商店] 購買 ${ITEMS[potionType].name}`);
 			this.refreshUI();
 		} else {
-			console.log('[商店] 購買失敗：道具欄已滿或無法購買');
+			console.log('[商店] 購買失敗：點數不足或道具欄已滿');
 		}
 	}
 
@@ -427,10 +536,20 @@ export class SupplyScene extends Phaser.Scene {
 	}
 
 	/**
+	 * 升級屬性
+	 */
+	private upgradeAttribute(attribute: keyof typeof this.gameState.playerStats.primary) {
+		const success = this.gameState.upgradeAttribute(attribute);
+
+		if (success) {
+			this.refreshUI();
+		}
+	}
+
+	/**
 	 * 重新整理 UI
 	 */
 	private refreshUI() {
-		// 重新建立整個場景是最簡單的方式
 		this.scene.restart();
 	}
 
@@ -447,7 +566,6 @@ export class SupplyScene extends Phaser.Scene {
 			this.scene.start('MainScene');
 		} else {
 			console.log('[遊戲] 恭喜通關！');
-			// 未來可以加入通關場景
 			this.scene.start('MainScene');
 		}
 	}
