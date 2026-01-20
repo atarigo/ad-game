@@ -23,7 +23,7 @@
 
 | 屬性名稱     | 英文名            | 計算公式                                   |
 | ------------ | ----------------- | ------------------------------------------ |
-| 近距離攻擊力 | Melee Attack      | `Strength + weaponAttack`                  |
+| 近距離攻擊力 | Melee Attack      | `Strength + 武器攻擊力`（優先使用裝備欄位）|
 | 魔法攻擊力   | Magic Attack      | `Intelligence + magicAttack + magicWeaponAttack` |
 | 遠程攻擊力   | Ranged Attack     | `weaponAttack + ammoAttack`                |
 
@@ -38,7 +38,7 @@
 
 | 屬性名稱   | 英文名        | 計算公式                        |
 | ---------- | ------------- | ------------------------------- |
-| 物理防禦   | Defense       | `Vitality`                      |
+| 物理防禦   | Defense       | `Vitality + armorDefense`       |
 | 魔法防禦力 | Magic Defense | `Intelligence + armorMagicDefense` |
 
 ### 回復類
