@@ -205,12 +205,14 @@ export class MainScene extends Phaser.Scene {
 	private createHealthBar(x: number, y: number): HealthBar {
 		const { width, height, strokeWidth } = HEALTH_BAR;
 
-		// 背景（灰色）
+		// 背景（灰色）- 以中心為原點
 		const background = this.add.rectangle(x, y, width, height, COLORS.healthBarBackground);
 		background.setStrokeStyle(strokeWidth, COLORS.healthBarStroke);
 
-		// 血量填充（綠色）
-		const fill = this.add.rectangle(x, y, width - 2, height - 2, COLORS.healthBarFill);
+		// 血量填充（綠色）- 以左側中心為原點
+		const fillX = x - width / 2 + 1; // 背景左邊界 + 1px 邊距
+		const fill = this.add.rectangle(fillX, y, width - 2, height - 2, COLORS.healthBarFill);
+		fill.setOrigin(0, 0.5); // 設置原點為左側中心
 
 		return { background, fill };
 	}
@@ -223,12 +225,11 @@ export class MainScene extends Phaser.Scene {
 		const healthPercent = stats.currentHealth / stats.derived.healthPoints;
 
 		// 計算填充寬度
-		const fillWidth = Math.max(0, (width - 2) * healthPercent);
-		healthBar.fill.width = fillWidth;
+		const maxFillWidth = width - 2;
+		const fillWidth = Math.max(0, maxFillWidth * healthPercent);
 
-		// 調整填充位置（從左側開始）
-		const offsetX = (width - 2 - fillWidth) / 2;
-		healthBar.fill.x = healthBar.background.x - offsetX;
+		// 因為 origin 設為 (0, 0.5)，只需更新寬度即可
+		healthBar.fill.width = fillWidth;
 
 		// 根據血量百分比改變顏色
 		if (healthPercent <= lowHealthThreshold) {
