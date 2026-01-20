@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { createGame, destroyGame, GAME_HEIGHT, GAME_WIDTH } from '$lib/games/infinity';
 	import type Phaser from 'phaser';
-	import { createGame, destroyGame, GAME_WIDTH, GAME_HEIGHT } from '$lib/games/infinity';
+	import { onDestroy, onMount } from 'svelte';
 
 	let gameContainer: HTMLDivElement;
 	let game: Phaser.Game | null = null;

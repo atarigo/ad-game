@@ -74,3 +74,16 @@ export const HEALTH_BAR = {
 	strokeWidth: 1,
 	lowHealthThreshold: 0.3 // 低血量閾值（30%）
 } as const;
+
+// 資訊抽屜設定
+export const INFO_DRAWER = {
+	height: 140, // 抽屜高度
+	padding: 12, // 內邊距
+	fontSize: 12,
+	titleFontSize: 14,
+	animationDuration: 200, // 動畫時間 (ms)
+	backgroundColor: 0x1a1a2e,
+	borderColor: 0x4a4a6a,
+	textColor: '#ffffff',
+	labelColor: '#aaaaaa'
+} as const;

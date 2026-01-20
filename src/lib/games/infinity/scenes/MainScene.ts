@@ -7,7 +7,8 @@ import {
 	ZONES,
 	ENEMY_GRID,
 	UI_BUTTON,
-	HEALTH_BAR
+	HEALTH_BAR,
+	INFO_DRAWER
 } from '../config';
 import { CharacterStats } from '../entities';
 
@@ -15,6 +16,15 @@ import { CharacterStats } from '../entities';
 interface HealthBar {
 	background: Phaser.GameObjects.Rectangle;
 	fill: Phaser.GameObjects.Rectangle;
+}
+
+// 資訊抽屜結構
+interface InfoDrawer {
+	container: Phaser.GameObjects.Container;
+	background: Phaser.GameObjects.Rectangle;
+	nameText: Phaser.GameObjects.Text;
+	healthText: Phaser.GameObjects.Text;
+	statsTexts: Phaser.GameObjects.Text[];
 }
 
 export class MainScene extends Phaser.Scene {
@@ -29,6 +39,11 @@ export class MainScene extends Phaser.Scene {
 	// 血量條
 	private playerHealthBar!: HealthBar;
 	private enemyHealthBar!: HealthBar;
+
+	// 資訊抽屜
+	private infoDrawer!: InfoDrawer;
+	private isDrawerOpen: boolean = false;
+	private clickedOnCharacter: boolean = false;
 
 	// 回合系統
 	private turnCount: number = 0;
@@ -101,8 +116,20 @@ export class MainScene extends Phaser.Scene {
 		// 添加簡單的邊框效果
 		this.player.setStrokeStyle(PLAYER.strokeWidth, COLORS.playerStroke);
 
+		// 設置玩家深度，確保可被點擊
+		this.player.setDepth(10);
+
 		// 建立血量條
 		this.createHealthBars();
+
+		// 建立資訊抽屜
+		this.createInfoDrawer();
+
+		// 設置角色點擊事件
+		this.setupCharacterInteraction();
+
+		// 設置點擊其他區域關閉抽屜
+		this.setupBackgroundClick();
 
 		// 建立 UI
 		this.createUI();
@@ -149,6 +176,9 @@ export class MainScene extends Phaser.Scene {
 			COLORS.enemy
 		);
 		this.enemy.setStrokeStyle(strokeWidth, COLORS.enemyStroke);
+
+		// 設置敵人深度，確保在血量條之上可被點擊
+		this.enemy.setDepth(10);
 	}
 
 	/**
@@ -414,13 +444,201 @@ export class MainScene extends Phaser.Scene {
 	}
 
 	/**
+	 * 建立資訊抽屜
+	 */
+	private createInfoDrawer() {
+		const { height, padding, fontSize, titleFontSize, backgroundColor, borderColor } = INFO_DRAWER;
+
+		// 建立容器（初始位置在畫面上方外側）
+		const container = this.add.container(0, -height);
+
+		// 背景
+		const background = this.add.rectangle(
+			GAME_WIDTH / 2,
+			height / 2,
+			GAME_WIDTH,
+			height,
+			backgroundColor
+		);
+		background.setStrokeStyle(2, borderColor);
+
+		// 名稱文字
+		const nameText = this.add.text(padding, padding, '敵人', {
+			fontSize: `${titleFontSize}px`,
+			color: INFO_DRAWER.textColor,
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+
+		// 血量文字
+		const healthText = this.add.text(padding, padding + 24, 'HP: 100/100', {
+			fontSize: `${fontSize}px`,
+			color: INFO_DRAWER.textColor,
+			fontFamily: 'Arial'
+		});
+
+		// 六屬性文字（分兩列）
+		const statsTexts: Phaser.GameObjects.Text[] = [];
+		const attributes = [
+			{ label: '力量', key: 'strength' },
+			{ label: '敏捷', key: 'agility' },
+			{ label: '體力', key: 'vitality' },
+			{ label: '智力', key: 'intelligence' },
+			{ label: '意志', key: 'willpower' },
+			{ label: '幸運', key: 'luck' }
+		];
+
+		const col1X = padding;
+		const col2X = GAME_WIDTH / 2 + padding;
+		const startY = padding + 50;
+		const lineHeight = 22;
+
+		attributes.forEach((attr, index) => {
+			const col = index < 3 ? col1X : col2X;
+			const row = index % 3;
+			const text = this.add.text(col, startY + row * lineHeight, `${attr.label}: 10`, {
+				fontSize: `${fontSize}px`,
+				color: INFO_DRAWER.labelColor,
+				fontFamily: 'Arial'
+			});
+			statsTexts.push(text);
+		});
+
+		// 將所有元素加入容器
+		container.add([background, nameText, healthText, ...statsTexts]);
+
+		// 設置深度，確保在最上層
+		container.setDepth(100);
+
+		this.infoDrawer = {
+			container,
+			background,
+			nameText,
+			healthText,
+			statsTexts
+		};
+	}
+
+	/**
+	 * 設置角色點擊事件（玩家和敵人）
+	 */
+	private setupCharacterInteraction() {
+		// 敵人點擊事件
+		this.enemy.setInteractive({ useHandCursor: true });
+		this.enemy.on('pointerdown', () => {
+			console.log('敵人被點擊');
+			this.clickedOnCharacter = true;
+			this.openDrawer(this.enemyStats, '敵人');
+		});
+
+		// 玩家點擊事件
+		this.player.setInteractive({ useHandCursor: true });
+		this.player.on('pointerdown', () => {
+			console.log('玩家被點擊');
+			this.clickedOnCharacter = true;
+			this.openDrawer(this.playerStats, '玩家');
+		});
+	}
+
+	/**
+	 * 設置點擊背景關閉抽屜
+	 */
+	private setupBackgroundClick() {
+		this.input.on('pointerdown', () => {
+			// 延遲檢查，讓角色的點擊事件先執行
+			this.time.delayedCall(10, () => {
+				if (this.clickedOnCharacter) {
+					this.clickedOnCharacter = false;
+					return;
+				}
+				if (this.isDrawerOpen) {
+					console.log('關閉抽屜');
+					this.closeDrawer();
+				}
+			});
+		});
+	}
+
+	/**
+	 * 開啟抽屜並顯示角色資訊
+	 */
+	private openDrawer(stats: CharacterStats, name: string) {
+		if (this.isDrawerOpen) {
+			// 如果已開啟，先關閉再開啟（更新內容）
+			this.updateDrawerContent(stats, name);
+			return;
+		}
+
+		this.isDrawerOpen = true;
+
+		// 更新抽屜內容
+		this.updateDrawerContent(stats, name);
+
+		// 滑入動畫
+		this.tweens.add({
+			targets: this.infoDrawer.container,
+			y: 0,
+			duration: INFO_DRAWER.animationDuration,
+			ease: 'Power2'
+		});
+	}
+
+	/**
+	 * 關閉抽屜
+	 */
+	private closeDrawer() {
+		if (!this.isDrawerOpen) return;
+
+		this.isDrawerOpen = false;
+
+		// 滑出動畫
+		this.tweens.add({
+			targets: this.infoDrawer.container,
+			y: -INFO_DRAWER.height,
+			duration: INFO_DRAWER.animationDuration,
+			ease: 'Power2'
+		});
+	}
+
+	/**
+	 * 更新抽屜內容
+	 */
+	private updateDrawerContent(stats: CharacterStats, name: string) {
+		const { primary, derived } = stats;
+
+		// 更新名稱
+		this.infoDrawer.nameText.setText(name);
+
+		// 更新血量
+		this.infoDrawer.healthText.setText(
+			`HP: ${stats.currentHealth.toFixed(0)}/${derived.healthPoints}`
+		);
+
+		// 更新六屬性
+		const attributes = [
+			{ label: '力量', value: primary.strength },
+			{ label: '敏捷', value: primary.agility },
+			{ label: '體力', value: primary.vitality },
+			{ label: '智力', value: primary.intelligence },
+			{ label: '意志', value: primary.willpower },
+			{ label: '幸運', value: primary.luck }
+		];
+
+		attributes.forEach((attr, index) => {
+			this.infoDrawer.statsTexts[index].setText(`${attr.label}: ${attr.value}`);
+		});
+	}
+
+	/**
 	 * 敵人被擊敗
 	 */
 	private onEnemyDefeated() {
 		console.log('🎉 敵人被擊敗！');
 		this.enemy.setVisible(false);
+		this.enemy.disableInteractive(); // 禁用互動
 		this.enemyHealthBar.background.setVisible(false);
 		this.enemyHealthBar.fill.setVisible(false);
+		this.closeDrawer(); // 關閉抽屜
 	}
 
 	/**
