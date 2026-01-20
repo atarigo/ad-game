@@ -1,0 +1,23 @@
+[
+	{
+		"id": "B-1",
+		"name": "B級關卡 1",
+		"enemies": [
+			{
+				"name": "精英哥布林",
+				"color": "0xcd853f",
+				"attributes": {
+					"strength": 15,
+					"vitality": 15,
+					"agility": 15,
+					"intelligence": 10,
+					"willpower": 10,
+					"luck": 12
+				},
+				"weapon": "iron_sword",
+				"armor": "leather",
+				"position": { "row": 1, "col": 2 }
+			}
+		]
+	}
+]

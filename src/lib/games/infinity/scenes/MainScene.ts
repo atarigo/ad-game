@@ -16,10 +16,13 @@ import {
 	CharacterStats,
 	ITEMS,
 	ItemType,
+	WEAPONS,
+	ARMORS,
 	createDefaultArmor,
 	createDefaultWeapon
 } from '../entities';
 import { GameState } from '../state';
+import type { EnemyConfig, StageConfig } from '../data';
 
 // 血量條結構
 interface HealthBar {
@@ -74,6 +77,7 @@ export class MainScene extends Phaser.Scene {
 	// 遊戲狀態
 	private gameState!: GameState;
 	private stageInfoText!: Phaser.GameObjects.Text;
+	private currentEnemyName: string = '敵人';
 
 	constructor() {
 		super({ key: 'MainScene' });
@@ -249,21 +253,29 @@ export class MainScene extends Phaser.Scene {
 	}
 
 	private spawnEnemy() {
-		const { cellSize, strokeWidth } = ENEMY_GRID;
+		const { cellSize, strokeWidth, columns } = ENEMY_GRID;
 
-		// 隨機選擇一個格子位置
-		const randomIndex = Phaser.Math.Between(0, this.gridPositions.length - 1);
-		const position = this.gridPositions[randomIndex];
+		// 取得當前關卡配置
+		const stageConfig = this.gameState.currentStageConfig;
+		const enemyConfig = stageConfig.enemies[0]; // 目前只處理第一個敵人
 
-		// 建立紅色敵人
+		// 根據關卡配置的位置計算座標
+		const gridIndex = enemyConfig.position.row * columns + enemyConfig.position.col;
+		const position = this.gridPositions[gridIndex] || this.gridPositions[0];
+
+		// 使用關卡配置的顏色
+		const enemyColor = enemyConfig.color;
+		const enemyStrokeColor = Phaser.Display.Color.ValueToColor(enemyColor).darken(30).color;
+
+		// 建立敵人
 		this.enemy = this.add.rectangle(
 			position.x,
 			position.y,
 			cellSize - 10, // 稍微小一點，讓格子邊框可見
 			cellSize - 10,
-			COLORS.enemy
+			enemyColor
 		);
-		this.enemy.setStrokeStyle(strokeWidth, COLORS.enemyStroke);
+		this.enemy.setStrokeStyle(strokeWidth, enemyStrokeColor);
 
 		// 設置敵人深度，確保在血量條之上可被點擊
 		this.enemy.setDepth(10);
@@ -517,13 +529,20 @@ export class MainScene extends Phaser.Scene {
 		// 玩家狀態從 GameState 取得（跨場景保留）
 		this.playerStats = this.gameState.playerStats;
 
-		// 敵人：使用預設屬性，裝備木劍和布甲，無道具
+		// 取得當前關卡配置
+		const stageConfig = this.gameState.currentStageConfig;
+		const enemyConfig = stageConfig.enemies[0]; // 目前只處理第一個敵人
+
+		// 儲存敵人名稱
+		this.currentEnemyName = enemyConfig.name;
+
+		// 敵人：使用關卡配置的屬性
 		this.enemyStats = new CharacterStats(
-			{}, // 使用預設主屬性
+			enemyConfig.attributes || {}, // 使用配置的主屬性
 			{}, // 不使用舊的裝備加成系統
 			{
-				weapon: createDefaultWeapon(), // 木劍 (+5 攻擊)
-				armor: createDefaultArmor(), // 布甲 (+1 防禦)
+				weapon: enemyConfig.weapon ? WEAPONS[enemyConfig.weapon] : createDefaultWeapon(),
+				armor: enemyConfig.armor ? ARMORS[enemyConfig.armor] : createDefaultArmor(),
 				items: [], // 敵人無道具
 				maxItemSlots: 0 // 敵人無道具欄位
 			}
@@ -532,6 +551,8 @@ export class MainScene extends Phaser.Scene {
 		// 輸出狀態到控制台供測試
 		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
 		console.log(`[遊戲] ${currentMapLevel}級地圖 第${currentStage}關（${currentStageNumber}/15）`);
+		console.log(`[關卡] ${stageConfig.id}: ${stageConfig.name}`);
+		console.log(`[敵人] ${enemyConfig.name}`);
 
 		console.log('Player Stats:', {
 			primary: this.playerStats.primary,
@@ -861,7 +882,7 @@ export class MainScene extends Phaser.Scene {
 		this.enemy.on('pointerdown', () => {
 			console.log('敵人被點擊');
 			this.clickedOnCharacter = true;
-			this.openDrawer(this.enemyStats, '敵人');
+			this.openDrawer(this.enemyStats, this.currentEnemyName);
 		});
 
 		// 玩家點擊事件

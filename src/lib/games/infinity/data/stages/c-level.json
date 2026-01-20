@@ -1,0 +1,23 @@
+[
+	{
+		"id": "C-1",
+		"name": "C級關卡 1",
+		"enemies": [
+			{
+				"name": "強化史萊姆",
+				"color": "0x00ff00",
+				"attributes": {
+					"strength": 12,
+					"vitality": 12,
+					"agility": 10,
+					"intelligence": 8,
+					"willpower": 8,
+					"luck": 8
+				},
+				"weapon": "iron_sword",
+				"armor": "leather",
+				"position": { "row": 1, "col": 2 }
+			}
+		]
+	}
+]

@@ -1,0 +1,23 @@
+[
+	{
+		"id": "A-1",
+		"name": "A級關卡 1",
+		"enemies": [
+			{
+				"name": "暗影騎士",
+				"color": "0x2f4f4f",
+				"attributes": {
+					"strength": 18,
+					"vitality": 18,
+					"agility": 16,
+					"intelligence": 14,
+					"willpower": 14,
+					"luck": 14
+				},
+				"weapon": "steel_sword",
+				"armor": "iron_armor",
+				"position": { "row": 1, "col": 2 }
+			}
+		]
+	}
+]

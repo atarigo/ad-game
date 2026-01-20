@@ -3,6 +3,8 @@
  */
 
 import { CharacterStats, createDefaultWeapon, createDefaultArmor, ITEMS, ItemType } from '../entities';
+import { getRandomStage } from '../data';
+import type { StageConfig } from '../data';
 
 /**
  * 地圖等級
@@ -89,6 +91,9 @@ export class GameState {
 	public currentStage: number = 1;
 	public totalStagesCleared: number = 0;
 
+	// 當前關卡配置
+	public currentStageConfig: StageConfig;
+
 	// 玩家狀態
 	public playerStats: CharacterStats;
 
@@ -98,6 +103,8 @@ export class GameState {
 	private constructor() {
 		// 初始化玩家狀態
 		this.playerStats = this.createInitialPlayerStats();
+		// 隨機選擇第一個關卡
+		this.currentStageConfig = getRandomStage(this.currentMapLevel);
 	}
 
 	/**
@@ -155,6 +162,9 @@ export class GameState {
 				this.currentMapLevel = MAP_LEVEL_ORDER[currentIndex + 1];
 			}
 		}
+
+		// 隨機選擇下一個關卡配置
+		this.currentStageConfig = getRandomStage(this.currentMapLevel);
 
 		return true;
 	}

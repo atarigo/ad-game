@@ -8,3 +8,6 @@ export {
 } from './GameState';
 
 export type { IGameState } from './GameState';
+
+// Re-export from data for convenience
+export type { StageConfig, EnemyConfig } from '../data';

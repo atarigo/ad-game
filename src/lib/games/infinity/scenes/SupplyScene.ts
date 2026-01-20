@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
 import { COLORS, GAME_HEIGHT, GAME_WIDTH, SHOP, ITEM_SLOTS } from '../config';
-import { ITEMS, ItemType } from '../entities';
-import type { Item } from '../entities';
+import { ITEMS, ItemType, type Item } from '../entities';
 import { GameState } from '../state';
 
 /**

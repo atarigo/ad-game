@@ -1,0 +1,23 @@
+[
+	{
+		"id": "S-1",
+		"name": "S級關卡 1",
+		"enemies": [
+			{
+				"name": "魔王先鋒",
+				"color": "0x8b0000",
+				"attributes": {
+					"strength": 22,
+					"vitality": 22,
+					"agility": 18,
+					"intelligence": 18,
+					"willpower": 18,
+					"luck": 16
+				},
+				"weapon": "steel_sword",
+				"armor": "iron_armor",
+				"position": { "row": 1, "col": 2 }
+			}
+		]
+	}
+]

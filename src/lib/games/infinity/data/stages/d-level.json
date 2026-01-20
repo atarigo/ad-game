@@ -1,0 +1,107 @@
+[
+	{
+		"id": "D-1",
+		"name": "史萊姆初遇",
+		"enemies": [
+			{
+				"name": "綠史萊姆",
+				"color": "0x00aa00",
+				"attributes": {
+					"strength": 8,
+					"vitality": 8,
+					"agility": 10,
+					"intelligence": 5,
+					"willpower": 5,
+					"luck": 5
+				},
+				"weapon": "wooden_sword",
+				"armor": "cloth_armor",
+				"position": { "row": 1, "col": 2 }
+			}
+		]
+	},
+	{
+		"id": "D-2",
+		"name": "哥布林斥候",
+		"enemies": [
+			{
+				"name": "哥布林",
+				"color": "0x8b4513",
+				"attributes": {
+					"strength": 10,
+					"vitality": 7,
+					"agility": 12,
+					"intelligence": 6,
+					"willpower": 5,
+					"luck": 8
+				},
+				"weapon": "wooden_sword",
+				"armor": "cloth_armor",
+				"position": { "row": 2, "col": 1 }
+			}
+		]
+	},
+	{
+		"id": "D-3",
+		"name": "野狼來襲",
+		"enemies": [
+			{
+				"name": "灰狼",
+				"color": "0x696969",
+				"attributes": {
+					"strength": 11,
+					"vitality": 9,
+					"agility": 13,
+					"intelligence": 4,
+					"willpower": 6,
+					"luck": 7
+				},
+				"weapon": "wooden_sword",
+				"armor": "cloth_armor",
+				"position": { "row": 1, "col": 3 }
+			}
+		]
+	},
+	{
+		"id": "D-4",
+		"name": "蝙蝠洞穴",
+		"enemies": [
+			{
+				"name": "洞穴蝙蝠",
+				"color": "0x4a4a4a",
+				"attributes": {
+					"strength": 7,
+					"vitality": 6,
+					"agility": 15,
+					"intelligence": 5,
+					"willpower": 5,
+					"luck": 10
+				},
+				"weapon": "wooden_sword",
+				"armor": "cloth_armor",
+				"position": { "row": 0, "col": 2 }
+			}
+		]
+	},
+	{
+		"id": "D-5",
+		"name": "骷髏士兵",
+		"enemies": [
+			{
+				"name": "骷髏兵",
+				"color": "0xf5f5dc",
+				"attributes": {
+					"strength": 12,
+					"vitality": 10,
+					"agility": 8,
+					"intelligence": 3,
+					"willpower": 8,
+					"luck": 5
+				},
+				"weapon": "wooden_sword",
+				"armor": "cloth_armor",
+				"position": { "row": 2, "col": 2 }
+			}
+		]
+	}
+]
