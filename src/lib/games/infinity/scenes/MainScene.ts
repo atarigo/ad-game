@@ -38,6 +38,13 @@ interface InfoDrawer {
 	itemsText: Phaser.GameObjects.Text;
 }
 
+// 道具格結構
+interface ItemSlot {
+	background: Phaser.GameObjects.Rectangle;
+	text: Phaser.GameObjects.Text | null;
+	index: number;
+}
+
 export class MainScene extends Phaser.Scene {
 	private player!: Phaser.GameObjects.Rectangle;
 	private enemy!: Phaser.GameObjects.Rectangle;
@@ -59,6 +66,9 @@ export class MainScene extends Phaser.Scene {
 	// 回合系統
 	private turnCount: number = 0;
 	private turnText!: Phaser.GameObjects.Text;
+
+	// 道具格
+	private itemSlots: ItemSlot[] = [];
 
 	constructor() {
 		super({ key: 'MainScene' });
@@ -343,17 +353,22 @@ export class MainScene extends Phaser.Scene {
 		// 從左邊開始排列
 		const startX = padding + size / 2;
 
+		// 清空舊的道具格
+		this.itemSlots = [];
+
 		// 建立道具格
 		for (let i = 0; i < maxSlots; i++) {
 			const x = startX + i * (size + gap);
 			const slot = this.add.rectangle(x, itemRowY, size, size, COLORS.itemSlot);
 			slot.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
 
+			let itemText: Phaser.GameObjects.Text | null = null;
+
 			// 如果有道具，顯示道具
 			if (i < this.playerStats.items.length) {
 				const item = this.playerStats.items[i];
 				// 在格子中央顯示道具圖示或文字
-				const itemText = this.add.text(x, itemRowY, item.name.charAt(0), {
+				itemText = this.add.text(x, itemRowY, item.name.charAt(0), {
 					fontSize: '16px',
 					color: '#ffffff',
 					fontFamily: 'Arial'
@@ -362,6 +377,127 @@ export class MainScene extends Phaser.Scene {
 
 				// 將格子改為有道具的顏色
 				slot.setFillStyle(COLORS.itemSlotFilled);
+
+				// 設置互動
+				slot.setInteractive({ useHandCursor: true });
+
+				// 點擊事件
+				const slotIndex = i;
+				slot.on('pointerdown', () => {
+					this.useItemAtSlot(slotIndex);
+				});
+
+				// 懸停效果
+				slot.on('pointerover', () => {
+					slot.setStrokeStyle(strokeWidth + 1, COLORS.itemSlotStroke);
+				});
+
+				slot.on('pointerout', () => {
+					slot.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
+				});
+			}
+
+			// 存儲道具格引用
+			this.itemSlots.push({
+				background: slot,
+				text: itemText,
+				index: i
+			});
+		}
+	}
+
+	/**
+	 * 使用指定位置的道具
+	 */
+	private useItemAtSlot(slotIndex: number) {
+		// 檢查是否有道具
+		if (slotIndex >= this.playerStats.items.length) {
+			console.log(`道具格 ${slotIndex} 沒有道具`);
+			return;
+		}
+
+		const item = this.playerStats.items[slotIndex];
+		const beforeHealth = this.playerStats.currentHealth;
+
+		// 使用道具
+		const success = this.playerStats.useItem(slotIndex);
+
+		if (success) {
+			const afterHealth = this.playerStats.currentHealth;
+			const healed = afterHealth - beforeHealth;
+
+			console.log(
+				`[使用道具] ${item.name} | 回復: ${healed.toFixed(1)} | 血量: ${afterHealth.toFixed(1)}/${this.playerStats.derived.healthPoints}`
+			);
+
+			// 更新血量條
+			this.updateHealthBar(this.playerHealthBar, this.playerStats);
+
+			// 閃爍效果（綠色表示回復）
+			this.flashEffect(this.player, 0x00ff00);
+
+			// 更新道具欄顯示
+			this.updateItemSlots();
+
+			// 如果資訊抽屜開啟且顯示玩家，更新內容
+			if (this.isDrawerOpen) {
+				this.updateDrawerContent(this.playerStats, '玩家');
+			}
+		}
+	}
+
+	/**
+	 * 更新道具格顯示
+	 */
+	private updateItemSlots() {
+		const { size, strokeWidth } = ITEM_SLOTS;
+
+		for (let i = 0; i < this.itemSlots.length; i++) {
+			const slot = this.itemSlots[i];
+
+			// 移除舊的文字
+			if (slot.text) {
+				slot.text.destroy();
+				slot.text = null;
+			}
+
+			// 移除舊的事件監聽器
+			slot.background.removeAllListeners();
+			slot.background.disableInteractive();
+
+			// 如果有道具，更新顯示
+			if (i < this.playerStats.items.length) {
+				const item = this.playerStats.items[i];
+
+				// 建立新的文字
+				slot.text = this.add.text(slot.background.x, slot.background.y, item.name.charAt(0), {
+					fontSize: '16px',
+					color: '#ffffff',
+					fontFamily: 'Arial'
+				});
+				slot.text.setOrigin(0.5);
+
+				// 更新顏色
+				slot.background.setFillStyle(COLORS.itemSlotFilled);
+
+				// 重新設置互動
+				slot.background.setInteractive({ useHandCursor: true });
+
+				const slotIndex = i;
+				slot.background.on('pointerdown', () => {
+					this.useItemAtSlot(slotIndex);
+				});
+
+				slot.background.on('pointerover', () => {
+					slot.background.setStrokeStyle(strokeWidth + 1, COLORS.itemSlotStroke);
+				});
+
+				slot.background.on('pointerout', () => {
+					slot.background.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
+				});
+			} else {
+				// 沒有道具，恢復空格顏色
+				slot.background.setFillStyle(COLORS.itemSlot);
 			}
 		}
 	}
