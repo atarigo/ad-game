@@ -581,11 +581,11 @@ export class MainScene extends Phaser.Scene {
 		const { width, height, padding, strokeWidth, fontSize } = UI_BUTTON;
 
 		// 關卡資訊（頂部）
-		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
+		const { currentMapLevel, currentStage, currentStageNumber, currentStageConfig } = this.gameState;
 		this.stageInfoText = this.add.text(
 			GAME_WIDTH / 2,
 			15,
-			`${currentMapLevel}級 - ${currentStage}/3（${currentStageNumber}/15）`,
+			`${currentMapLevel}級 - ${currentStage}/3（${currentStageNumber}/15）${currentStageConfig.name}`,
 			{
 				fontSize: '12px',
 				color: '#aaaaaa',
