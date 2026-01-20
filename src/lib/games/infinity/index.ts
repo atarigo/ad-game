@@ -23,6 +23,9 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 		scale: {
 			mode: Phaser.Scale.FIT,
 			autoCenter: Phaser.Scale.CENTER_BOTH
+		},
+		audio: {
+			disableWebAudio: true // 禁用 WebAudio，避免場景切換時的 AudioContext 錯誤
 		}
 	};
 
