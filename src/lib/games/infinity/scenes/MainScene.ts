@@ -50,7 +50,7 @@ interface ItemSlot {
 }
 
 export class MainScene extends Phaser.Scene {
-	private player!: Phaser.GameObjects.Rectangle;
+	private player!: Phaser.GameObjects.Sprite;
 	private enemy!: Phaser.GameObjects.Rectangle;
 	private gridPositions: { x: number; y: number }[] = [];
 
@@ -81,6 +81,11 @@ export class MainScene extends Phaser.Scene {
 
 	constructor() {
 		super({ key: 'MainScene' });
+	}
+
+	preload() {
+		// 載入玩家圖片
+		this.load.image('player', '/src/lib/assets/player.png');
 	}
 
 	create() {
@@ -183,24 +188,19 @@ export class MainScene extends Phaser.Scene {
 		// 隨機生成一個敵人
 		this.spawnEnemy();
 
-		// 建立綠色方塊代表 player（置於玩家區域中央）
+		// 建立玩家精靈（置於玩家區域中央）
 		const playerY =
 			GAME_HEIGHT -
 			ZONES.uiAreaHeight -
 			ZONES.skillRowHeight -
 			ZONES.itemRowHeight -
-			PLAYER.bottomPadding -
-			PLAYER.height / 2;
-		this.player = this.add.rectangle(
-			GAME_WIDTH / 2,
-			playerY,
-			PLAYER.width,
-			PLAYER.height,
-			COLORS.player
-		);
+			ZONES.playerAreaHeight / 2;
+		this.player = this.add.sprite(GAME_WIDTH / 2, playerY, 'player');
 
-		// 添加簡單的邊框效果
-		this.player.setStrokeStyle(PLAYER.strokeWidth, COLORS.playerStroke);
+		// 縮放圖片以適應玩家區域（保持比例）
+		const targetHeight = ZONES.playerAreaHeight - 20; // 留一些邊距
+		const scale = targetHeight / this.player.height;
+		this.player.setScale(scale);
 
 		// 設置玩家深度，確保可被點擊
 		this.player.setDepth(10);
@@ -285,10 +285,11 @@ export class MainScene extends Phaser.Scene {
 	 * 建立血量條
 	 */
 	private createHealthBars() {
-		// 玩家血量條
+		// 玩家血量條（使用縮放後的實際高度）
+		const playerDisplayHeight = this.player.displayHeight;
 		this.playerHealthBar = this.createHealthBar(
 			this.player.x,
-			this.player.y - PLAYER.height / 2 - HEALTH_BAR.offsetY
+			this.player.y - playerDisplayHeight / 2 - HEALTH_BAR.offsetY
 		);
 
 		// 敵人血量條
@@ -756,13 +757,21 @@ export class MainScene extends Phaser.Scene {
 	/**
 	 * 閃爍效果
 	 */
-	private flashEffect(target: Phaser.GameObjects.Rectangle, color: number) {
-		const originalColor = target.fillColor;
-		target.setFillStyle(color);
-
-		this.time.delayedCall(100, () => {
-			target.setFillStyle(originalColor);
-		});
+	private flashEffect(target: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite, color: number) {
+		if (target instanceof Phaser.GameObjects.Sprite) {
+			// Sprite 使用 tint
+			target.setTint(color);
+			this.time.delayedCall(100, () => {
+				target.clearTint();
+			});
+		} else {
+			// Rectangle 使用 fillStyle
+			const originalColor = target.fillColor;
+			target.setFillStyle(color);
+			this.time.delayedCall(100, () => {
+				target.setFillStyle(originalColor);
+			});
+		}
 	}
 
 	/**
@@ -1030,6 +1039,7 @@ export class MainScene extends Phaser.Scene {
 	 */
 	private onPlayerDefeated() {
 		console.log('💀 玩家被擊敗！遊戲結束');
-		this.player.setFillStyle(0x555555);
+		// 將玩家變灰色表示死亡
+		this.player.setTint(0x555555);
 	}
 }
