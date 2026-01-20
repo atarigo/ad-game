@@ -543,6 +543,7 @@ export class MainScene extends Phaser.Scene {
 			// 顯示回復數字（如果有回復）
 			if (healAmount > 0) {
 				this.showDamageNumber(this.player.x, this.player.y, healAmount, false, true);
+				console.log(`[使用道具] 回復血量: +${healAmount.toFixed(1)} (${oldHealth.toFixed(1)} → ${this.playerStats.currentHealth.toFixed(1)})`);
 			}
 			
 			this.updateItemSlots();
@@ -781,6 +782,7 @@ export class MainScene extends Phaser.Scene {
 		// 顯示玩家回復數字（如果有回復）
 		if (playerHealAmount > 0) {
 			this.showDamageNumber(this.player.x, this.player.y, playerHealAmount, false, true);
+			console.log(`[回合結束] 玩家回復血量: +${playerHealAmount.toFixed(1)} (${playerOldHealth.toFixed(1)} → ${this.playerStats.currentHealth.toFixed(1)})`);
 		}
 
 		// 敵人回復
@@ -794,6 +796,7 @@ export class MainScene extends Phaser.Scene {
 				// 顯示敵人回復數字（如果有回復）
 				if (enemyHealAmount > 0) {
 					this.showDamageNumber(enemy.gameObject.x, enemy.gameObject.y, enemyHealAmount, false, true);
+					console.log(`[回合結束] ${enemy.instance.name} 回復血量: +${enemyHealAmount.toFixed(1)} (${enemyOldHealth.toFixed(1)} → ${enemy.stats.currentHealth.toFixed(1)})`);
 				}
 			}
 		}
