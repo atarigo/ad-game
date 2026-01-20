@@ -4,6 +4,9 @@
  */
 
 import { CharacterStats } from '../entities';
+import type { Skill } from '../entities/Skill';
+import { DamageType, type DamageSource, type DamageResult } from '../entities/DamageSystem';
+import { StatusEffectType } from '../entities/StatusEffect';
 
 /**
  * 攻擊結果
@@ -27,11 +30,22 @@ export interface TurnResult {
 }
 
 /**
+ * 技能使用結果
+ */
+export interface SkillResult {
+	skillId: string;
+	damageResults: DamageResult[];
+	statusEffects: Array<{ type: StatusEffectType; duration: number; value?: number }>;
+	targetDefeated: boolean;
+}
+
+/**
  * 戰鬥事件回調
  */
 export interface BattleCallbacks {
 	onPlayerAttack?: (result: AttackResult, targetIndex: number) => void;
 	onEnemyAttack?: (result: AttackResult, attackerIndex: number) => void;
+	onPlayerSkillUse?: (skillId: string, result: SkillResult, targetIndex: number) => void;
 	onPlayerDefeated?: () => void;
 	onEnemyDefeated?: (index: number) => void;
 	onTurnEnd?: (turnResult: TurnResult) => void;
@@ -199,7 +213,102 @@ export class BattleManager {
 	}
 
 	/**
-	 * 執行回合結束效果（回復）
+	 * 執行玩家技能
+	 */
+	public executePlayerSkill(skillId: string, targetIndex?: number): SkillResult | null {
+		const index = targetIndex ?? this.selectedTargetIndex;
+
+		// 檢查技能是否可用
+		if (!this.playerStats.canUseSkill(skillId)) {
+			return null;
+		}
+
+		if (index < 0 || index >= this.enemyStats.length) {
+			return null;
+		}
+
+		const target = this.enemyStats[index];
+		if (!target || !target.isAlive) {
+			// 嘗試找一個活著的敵人
+			const aliveIndex = this.selectNextAliveEnemy();
+			if (aliveIndex === -1) return null;
+			return this.executePlayerSkill(skillId, aliveIndex);
+		}
+
+		const skill = this.playerStats.skills.getSkill(skillId);
+		if (!skill) {
+			return null;
+		}
+
+		// 消耗魔力
+		if (!this.playerStats.consumeMana(skill.manaCost)) {
+			return null;
+		}
+
+		// 開始冷卻
+		this.playerStats.skills.useSkill(skillId);
+
+		// 執行技能效果
+		const result = this.executeSkillEffects(skill, this.playerStats, target);
+
+		// 觸發回調
+		this.callbacks.onPlayerSkillUse?.(skillId, result, index);
+
+		if (result.targetDefeated) {
+			this.callbacks.onEnemyDefeated?.(index);
+		}
+
+		return result;
+	}
+
+	/**
+	 * 執行技能效果
+	 */
+	private executeSkillEffects(skill: Skill, attacker: CharacterStats, defender: CharacterStats): SkillResult {
+		const damageResults: DamageResult[] = [];
+		const statusEffects: Array<{ type: StatusEffectType; duration: number; value?: number }> = [];
+
+		for (const effect of skill.effects) {
+			if (effect.type === 'damage') {
+				// 計算傷害
+				const damageSource: DamageSource = {
+					type: effect.damageType ?? DamageType.Physical,
+					multiplier: effect.multiplier,
+					attribute: effect.attribute,
+					attributePercent: effect.attributePercent,
+					attacker
+				};
+
+				const damageResult = defender.takeDamageFromSource(damageSource);
+				damageResults.push(damageResult);
+			}
+
+			if (effect.type === 'stun' && effect.statusEffect) {
+				// 添加狀態效果
+				defender.statusEffects.addEffect({
+					type: effect.statusEffect.type,
+					duration: effect.statusEffect.duration,
+					value: effect.statusEffect.value,
+					source: skill.id
+				});
+				statusEffects.push({
+					type: effect.statusEffect.type,
+					duration: effect.statusEffect.duration,
+					value: effect.statusEffect.value
+				});
+			}
+		}
+
+		return {
+			skillId: skill.id,
+			damageResults,
+			statusEffects,
+			targetDefeated: !defender.isAlive
+		};
+	}
+
+	/**
+	 * 執行回合結束效果（回復、狀態效果、冷卻）
 	 */
 	public applyEndOfTurnEffects(): void {
 		// 玩家回復
@@ -222,6 +331,28 @@ export class BattleManager {
 				this.callbacks.onRegeneration?.('enemy', i, healthRestored);
 			}
 		}
+
+		// 更新狀態效果（包含持續傷害）
+		this.playerStats.updateStatusEffects();
+		for (const enemy of this.enemyStats) {
+			if (enemy.isAlive) {
+				enemy.updateStatusEffects();
+			}
+		}
+
+		// 更新技能冷卻
+		this.playerStats.skills.updateCooldowns();
+	}
+
+	/**
+	 * 檢查敵人是否應該跳過回合（被暈眩）
+	 */
+	public shouldSkipEnemyTurn(enemyIndex: number): boolean {
+		if (enemyIndex < 0 || enemyIndex >= this.enemyStats.length) {
+			return false;
+		}
+		const enemy = this.enemyStats[enemyIndex];
+		return enemy.isStunned();
 	}
 
 	/**

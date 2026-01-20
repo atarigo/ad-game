@@ -23,3 +23,24 @@ export {
 } from './Equipment';
 
 export type { Weapon, Armor, Item } from './Equipment';
+
+export {
+	StatusEffectManager,
+	StatusEffectType
+} from './StatusEffect';
+
+export type { StatusEffect } from './StatusEffect';
+
+export {
+	DamageType,
+	calculateDamage
+} from './DamageSystem';
+
+export type { DamageSource, DamageResult } from './DamageSystem';
+
+export {
+	SkillType,
+	SkillManager
+} from './Skill';
+
+export type { Skill, SkillEffect, LearnedSkill } from './Skill';

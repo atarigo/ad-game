@@ -1,0 +1,64 @@
+[
+	{
+		"id": "true_strike",
+		"name": "真實打擊",
+		"nameEn": "True Strike",
+		"description": "造成力量 60% 的真實傷害，無視敵人防禦",
+		"type": "active",
+		"effects": [
+			{
+				"type": "damage",
+				"damageType": "true",
+				"attribute": "strength",
+				"attributePercent": 0.6
+			}
+		],
+		"manaCost": 20,
+		"cooldown": 2,
+		"price": 15000,
+		"tier": "D"
+	},
+	{
+		"id": "heavy_strike",
+		"name": "重擊",
+		"nameEn": "Heavy Strike",
+		"description": "造成 150% 的普通攻擊傷害",
+		"type": "active",
+		"effects": [
+			{
+				"type": "damage",
+				"damageType": "physical",
+				"multiplier": 1.5
+			}
+		],
+		"manaCost": 25,
+		"cooldown": 3,
+		"price": 25000,
+		"tier": "C"
+	},
+	{
+		"id": "stun_strike",
+		"name": "暈眩打擊",
+		"nameEn": "Stun Strike",
+		"description": "造成普通攻擊傷害並使敵人暈眩 2 回合",
+		"type": "active",
+		"effects": [
+			{
+				"type": "damage",
+				"damageType": "physical",
+				"multiplier": 1.0
+			},
+			{
+				"type": "stun",
+				"statusEffect": {
+					"type": "stun",
+					"duration": 2
+				}
+			}
+		],
+		"manaCost": 30,
+		"cooldown": 4,
+		"price": 35000,
+		"tier": "B"
+	}
+]

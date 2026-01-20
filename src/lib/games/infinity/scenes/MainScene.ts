@@ -19,7 +19,9 @@ import {
 	WEAPONS,
 	ARMORS,
 	createDefaultArmor,
-	createDefaultWeapon
+	createDefaultWeapon,
+	DamageType,
+	type DamageSource
 } from '../entities';
 import { GameState } from '../state';
 import type { StageConfig, WaveConfig, WinCondition, EnemySpawn, MonsterInstance } from '../data';
@@ -455,6 +457,15 @@ export class MainScene extends Phaser.Scene {
 		}
 	}
 
+	// 技能格結構
+	private skillSlots: Array<{
+		background: Phaser.GameObjects.Rectangle;
+		text: Phaser.GameObjects.Text | null;
+		cooldownText: Phaser.GameObjects.Text | null;
+		skillId: string | null;
+		index: number;
+	}> = [];
+
 	/**
 	 * 建立技能格
 	 */
@@ -465,10 +476,190 @@ export class MainScene extends Phaser.Scene {
 		// 從左側開始排列
 		const startX = padding + size / 2;
 
+		this.skillSlots = [];
+
 		for (let i = 0; i < 3; i++) {
 			const x = startX + i * (size + gap);
 			const slot = this.add.rectangle(x, skillRowY, size, size, COLORS.skillSlot);
 			slot.setStrokeStyle(2, COLORS.skillSlotStroke);
+
+			this.skillSlots.push({
+				background: slot,
+				text: null,
+				cooldownText: null,
+				skillId: null,
+				index: i
+			});
+		}
+
+		// 更新技能格顯示
+		this.updateSkillSlots();
+	}
+
+	/**
+	 * 更新技能格顯示
+	 */
+	private updateSkillSlots() {
+		const learnedSkills = this.playerStats.skills.getLearnedSkills();
+
+		for (let i = 0; i < this.skillSlots.length; i++) {
+			const slot = this.skillSlots[i];
+
+			// 清除舊的文字
+			if (slot.text) slot.text.destroy();
+			if (slot.cooldownText) slot.cooldownText.destroy();
+
+			if (i < learnedSkills.length) {
+				const learned = learnedSkills[i];
+				const skill = this.playerStats.skills.getSkill(learned.skillId);
+				if (!skill) continue;
+
+				slot.skillId = learned.skillId;
+				const canUse = this.playerStats.canUseSkill(learned.skillId);
+				const isOnCooldown = learned.isOnCooldown;
+
+				// 更新背景顏色
+				if (canUse) {
+					slot.background.setFillStyle(COLORS.itemSlotFilled);
+				} else {
+					slot.background.setFillStyle(0x444444);
+				}
+
+				// 技能名稱（首字母）
+				slot.text = this.add.text(slot.background.x, slot.background.y - 5, skill.name.charAt(0), {
+					fontSize: '14px',
+					color: canUse ? '#ffffff' : '#888888',
+					fontFamily: 'Arial'
+				});
+				slot.text.setOrigin(0.5);
+
+				// 冷卻倒數
+				if (isOnCooldown) {
+					slot.cooldownText = this.add.text(
+						slot.background.x,
+						slot.background.y + 8,
+						`${learned.currentCooldown}`,
+						{
+							fontSize: '10px',
+							color: '#ff6666',
+							fontFamily: 'Arial'
+						}
+					);
+					slot.cooldownText.setOrigin(0.5);
+				}
+
+				// 互動
+				if (canUse) {
+					slot.background.setInteractive({ useHandCursor: true });
+					slot.background.on('pointerover', () => {
+						slot.background.setStrokeStyle(3, COLORS.buttonHover);
+					});
+					slot.background.on('pointerout', () => {
+						slot.background.setStrokeStyle(2, COLORS.skillSlotStroke);
+					});
+
+					const skillId = learned.skillId;
+					slot.background.on('pointerdown', () => {
+						this.useSkill(skillId);
+					});
+				} else {
+					slot.background.disableInteractive();
+				}
+			} else {
+				// 空技能格
+				slot.skillId = null;
+				slot.background.setFillStyle(COLORS.skillSlot);
+				slot.background.disableInteractive();
+			}
+		}
+	}
+
+	/**
+	 * 使用技能
+	 */
+	private useSkill(skillId: string) {
+		const enemy = this.enemies[this.selectedEnemyIndex];
+		if (!enemy || !enemy.isAlive) {
+			// 找一個活著的敵人
+			const aliveIndex = this.enemies.findIndex((e) => e.isAlive);
+			if (aliveIndex === -1) return;
+			this.selectedEnemyIndex = aliveIndex;
+		}
+
+		const target = this.enemies[this.selectedEnemyIndex];
+		if (!target || !target.isAlive) return;
+
+		const skill = this.playerStats.skills.getSkill(skillId);
+		if (!skill) return;
+
+		// 檢查技能是否可用
+		if (!this.playerStats.canUseSkill(skillId)) {
+			console.log(`[技能] ${skill.name} 無法使用（魔力不足或冷卻中）`);
+			return;
+		}
+
+		// 消耗魔力
+		if (!this.playerStats.consumeMana(skill.manaCost)) {
+			return;
+		}
+
+		// 開始冷卻
+		this.playerStats.skills.useSkill(skillId);
+
+		// 執行技能效果
+		let totalDamage = 0;
+		let hasStun = false;
+
+		for (const effect of skill.effects) {
+			if (effect.type === 'damage') {
+				// 計算傷害
+				const damageSource: DamageSource = {
+					type: effect.damageType ?? DamageType.Physical,
+					multiplier: effect.multiplier,
+					attribute: effect.attribute,
+					attributePercent: effect.attributePercent,
+					attacker: this.playerStats
+				};
+
+				const damageResult = target.stats.takeDamageFromSource(damageSource);
+				totalDamage += damageResult.actualDamage;
+
+				// 顯示傷害數字
+				this.showDamageNumber(
+					target.gameObject.x,
+					target.gameObject.y,
+					damageResult.actualDamage,
+					false,
+					false
+				);
+			}
+
+			if (effect.type === 'stun' && effect.statusEffect) {
+				// 添加暈眩狀態
+				target.stats.statusEffects.addEffect({
+					type: effect.statusEffect.type,
+					duration: effect.statusEffect.duration,
+					value: effect.statusEffect.value,
+					source: skillId
+				});
+				hasStun = true;
+			}
+		}
+
+		// 更新血量條
+		this.updateHealthBar(target.healthBar, target.stats);
+		this.flashEffect(target.gameObject, 0xffffff);
+
+		// 更新技能格
+		this.updateSkillSlots();
+
+		console.log(
+			`[技能] 使用 ${skill.name}，造成 ${totalDamage.toFixed(1)} 傷害${hasStun ? '，敵人被暈眩' : ''}`
+		);
+
+		// 檢查敵人是否死亡
+		if (!target.stats.isAlive) {
+			this.onEnemyDefeated(this.selectedEnemyIndex);
 		}
 	}
 
@@ -746,6 +937,13 @@ export class MainScene extends Phaser.Scene {
 		for (const enemy of this.enemies) {
 			if (!enemy.isAlive) continue;
 
+			// 檢查是否被暈眩（跳過回合）
+			if (enemy.stats.isStunned()) {
+				console.log(`[${enemy.instance.name}] 被暈眩，跳過本回合`);
+				// 減少暈眩持續時間（已在 updateStatusEffects 中處理，這裡只是日誌）
+				continue;
+			}
+
 			let damage = enemy.stats.derived.meleeAttack;
 			let isCritical = false;
 
@@ -800,6 +998,20 @@ export class MainScene extends Phaser.Scene {
 				}
 			}
 		}
+
+		// 更新狀態效果（包含持續傷害）
+		this.playerStats.updateStatusEffects();
+		for (const enemy of this.enemies) {
+			if (enemy.isAlive) {
+				enemy.stats.updateStatusEffects();
+			}
+		}
+
+		// 更新技能冷卻
+		this.playerStats.skills.updateCooldowns();
+
+		// 更新技能格顯示
+		this.updateSkillSlots();
 
 		console.log(`[回合結束] 玩家血量: ${this.playerStats.currentHealth.toFixed(1)}/${this.playerStats.derived.healthPoints}`);
 	}

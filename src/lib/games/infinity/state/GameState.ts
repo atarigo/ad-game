@@ -3,6 +3,7 @@
  */
 
 import { CharacterStats, createDefaultWeapon, createDefaultArmor, ITEMS, ItemType } from '../entities';
+import { getAllSkills } from '../data/skills';
 import { getRandomStage } from '../data';
 import type { StageConfig } from '../data';
 import {
@@ -167,7 +168,7 @@ export class GameState {
 	 * 建立初始玩家狀態
 	 */
 	private createInitialPlayerStats(): CharacterStats {
-		return new CharacterStats(
+		const stats = new CharacterStats(
 			{},
 			{},
 			{
@@ -177,6 +178,12 @@ export class GameState {
 				maxItemSlots: 1
 			}
 		);
+
+		// 註冊所有技能定義到技能管理器
+		const allSkills = getAllSkills();
+		stats.skills.registerSkills(allSkills);
+
+		return stats;
 	}
 
 	/**
@@ -343,5 +350,26 @@ export class GameState {
 	 */
 	public healPlayerToFull(): void {
 		this.playerStats.resetToMax();
+	}
+
+	/**
+	 * 購買技能
+	 * @returns 是否成功購買
+	 */
+	public buySkill(skillId: string): boolean {
+		const skill = this.playerStats.skills.getSkill(skillId);
+		if (!skill) {
+			return false; // 技能不存在
+		}
+
+		if (this.playerStats.skills.hasSkill(skillId)) {
+			return false; // 已學習
+		}
+
+		if (!this.spendPoints(skill.price)) {
+			return false; // 點數不足
+		}
+
+		return this.playerStats.learnSkill(skillId);
 	}
 }

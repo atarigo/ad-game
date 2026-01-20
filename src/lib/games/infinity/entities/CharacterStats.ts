@@ -4,6 +4,9 @@
  */
 
 import type { Weapon, Armor, Item } from './Equipment';
+import { StatusEffectManager, StatusEffectType, type StatusEffect } from './StatusEffect';
+import { calculateDamage, type DamageSource, type DamageResult, DamageType } from './DamageSystem';
+import { SkillManager } from './Skill';
 
 // 主屬性基礎值
 export const BASE_ATTRIBUTE_VALUE = 10;
@@ -122,6 +125,12 @@ export class CharacterStats {
 	/** 當前魔力 */
 	public currentMana: number;
 
+	/** 狀態效果管理器 */
+	public statusEffects: StatusEffectManager = new StatusEffectManager();
+
+	/** 技能管理器 */
+	public skills: SkillManager = new SkillManager();
+
 	constructor(
 		primary: Partial<PrimaryAttributes> = {},
 		equipment: Partial<EquipmentBonuses> = {},
@@ -200,16 +209,28 @@ export class CharacterStats {
 	}
 
 	/**
-	 * 受到傷害
+	 * 受到傷害（擴展版，支援多種傷害類型）
+	 * @param source 傷害來源
+	 * @param isCritical 是否為暴擊
+	 * @returns 傷害結果
+	 */
+	takeDamageFromSource(source: DamageSource, isCritical: boolean = false): DamageResult {
+		return calculateDamage(source, this, isCritical);
+	}
+
+	/**
+	 * 受到傷害（向後兼容）
 	 * @param damage 傷害值
 	 * @param isMagic 是否為魔法傷害
 	 * @returns 實際受到的傷害值
 	 */
 	takeDamage(damage: number, isMagic: boolean = false): number {
-		const defense = isMagic ? this.derived.magicDefense : this.derived.defense;
-		const actualDamage = Math.max(0, damage - defense);
-		this.currentHealth = Math.max(0, this.currentHealth - actualDamage);
-		return actualDamage;
+		const source: DamageSource = {
+			type: isMagic ? DamageType.Magic : DamageType.Physical,
+			baseValue: damage
+		};
+		const result = this.takeDamageFromSource(source);
+		return result.actualDamage;
 	}
 
 	/**
@@ -318,5 +339,44 @@ export class CharacterStats {
 	 */
 	get hasItemSpace(): boolean {
 		return this.items.length < this.maxItemSlots;
+	}
+
+	/**
+	 * 檢查是否被暈眩
+	 */
+	isStunned(): boolean {
+		return this.statusEffects.hasEffect(StatusEffectType.Stun);
+	}
+
+	/**
+	 * 更新狀態效果（回合結束時調用）
+	 */
+	updateStatusEffects(): void {
+		// 更新持續時間
+		this.statusEffects.updateEffects();
+
+		// 處理持續傷害效果
+		for (const effect of this.statusEffects.getEffects()) {
+			if (effect.type === StatusEffectType.Poison && effect.value) {
+				this.takeDamage(effect.value, false);
+			}
+			if (effect.type === StatusEffectType.Burn && effect.value) {
+				this.takeDamage(effect.value, false);
+			}
+		}
+	}
+
+	/**
+	 * 學習技能
+	 */
+	learnSkill(skillId: string): boolean {
+		return this.skills.learnSkill(skillId);
+	}
+
+	/**
+	 * 檢查技能是否可用
+	 */
+	canUseSkill(skillId: string): boolean {
+		return this.skills.canUseSkill(skillId, this.currentMana);
 	}
 }

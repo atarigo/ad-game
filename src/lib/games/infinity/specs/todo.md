@@ -79,10 +79,10 @@
 - [ ] 敵人死亡動畫
 
 #### 技能系統
-- [ ] 技能設計（主動技能）
-- [ ] 技能冷卻機制
-- [ ] 技能使用 UI
-- [ ] 技能效果實作
+- [x] 技能設計（主動技能）
+- [x] 技能冷卻機制
+- [x] 技能使用 UI
+- [x] 技能效果實作
 
 ### 優先度：中 🟡
 
@@ -195,11 +195,11 @@
 ### 階段 0：資料結構重構
 
 #### 0.1 怪物模板系統
-- [ ] 建立 `data/monsters/` 資料夾
-- [ ] 定義 `MonsterTemplate` 介面
-- [ ] 建立怪物 JSON（史萊姆、哥布林、Boss 等）
-- [ ] 關卡配置改為引用 `monsterId`
-- [ ] 實作屬性縮放（D=1x, C=1.2x, B=1.6x, A=2.2x, S=3x）
+- [x] 建立 `data/monsters/` 資料夾
+- [x] 定義 `MonsterTemplate` 介面
+- [x] 建立怪物 JSON（史萊姆、哥布林、Boss 等）
+- [x] 關卡配置改為引用 `monsterId`
+- [x] 實作屬性縮放（D=1x, C=1.2x, B=1.6x, A=2.2x, S=3x）
 
 ```typescript
 interface MonsterTemplate {
@@ -214,10 +214,10 @@ interface MonsterTemplate {
 ```
 
 #### 0.2 波次系統
-- [ ] 重構 `StageConfig` 加入 `waves[]`
-- [ ] 定義 `WaveConfig` 介面
-- [ ] 修改關卡 JSON 結構
-- [ ] MainScene 支援波次切換
+- [x] 重構 `StageConfig` 加入 `waves[]`
+- [x] 定義 `WaveConfig` 介面
+- [x] 修改關卡 JSON 結構
+- [x] MainScene 支援波次切換
 
 ```typescript
 interface StageConfig {
@@ -236,11 +236,11 @@ interface WaveConfig {
 ```
 
 #### 0.3 勝利條件系統
-- [ ] 定義 `WinCondition` 類型
-- [ ] 實作全滅判定（annihilation）
-- [ ] 實作存活判定（survive）
-- [ ] 實作目標判定（target）
-- [ ] UI 顯示當前勝利條件
+- [x] 定義 `WinCondition` 類型
+- [x] 實作全滅判定（annihilation）
+- [x] 實作存活判定（survive）
+- [x] 實作目標判定（target）
+- [x] UI 顯示當前勝利條件
 
 ```typescript
 type WinCondition = 

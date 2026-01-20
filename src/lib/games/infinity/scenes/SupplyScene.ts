@@ -3,6 +3,8 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH, SHOP, ITEM_SLOTS } from '../config';
 import { ITEMS, ItemType, type Item, type PrimaryAttributes } from '../entities';
 import { GameState, getPotionPrice } from '../state';
 import { getAttributeUpgradeCost } from '../data/constants';
+import { getAllSkills, getSkillsByTier } from '../data/skills';
+import type { Skill } from '../entities/Skill';
 
 /**
  * 商品結構
@@ -57,6 +59,9 @@ export class SupplyScene extends Phaser.Scene {
 
 		// 道具欄區域
 		this.createInventory();
+
+		// 技能商店區域
+		this.createSkillShop();
 
 		// 屬性升級區域
 		this.createAttributeUpgrade();
@@ -389,11 +394,109 @@ export class SupplyScene extends Phaser.Scene {
 	}
 
 	/**
+	 * 建立技能商店區域
+	 */
+	private createSkillShop() {
+		const startY = 390;
+		const padding = SHOP.padding;
+		const { itemSize, itemGap, fontSize, titleFontSize, priceColor, disabledColor } = SHOP;
+
+		// 標題
+		this.add.text(padding, startY, '技能商店', {
+			fontSize: `${titleFontSize}px`,
+			color: '#ffffff',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+
+		// 取得未學習的技能
+		const availableSkills = getAllSkills().filter((skill) => {
+			return !this.gameState.playerStats.skills.hasSkill(skill.id);
+		});
+
+		// 顯示技能（最多3個）
+		const skillsToShow = availableSkills.slice(0, 3);
+		const itemsPerRow = 3;
+
+		for (let i = 0; i < skillsToShow.length; i++) {
+			const skill = skillsToShow[i];
+			const col = i % itemsPerRow;
+			const row = Math.floor(i / itemsPerRow);
+			const x = padding + col * (itemSize + itemGap) + itemSize / 2;
+			const y = startY + 30 + row * (itemSize + itemGap + 20) + itemSize / 2;
+
+			this.createSkillShopItem(x, y, skill);
+		}
+	}
+
+	/**
+	 * 建立技能商品格子
+	 */
+	private createSkillShopItem(x: number, y: number, skill: Skill) {
+		const { itemSize, fontSize, priceColor, disabledColor } = SHOP;
+		const canAfford = this.gameState.points >= skill.price;
+		const canBuy = canAfford;
+
+		// 背景
+		const background = this.add.rectangle(x, y, itemSize, itemSize, canBuy ? COLORS.button : disabledColor);
+		background.setStrokeStyle(2, COLORS.buttonStroke);
+
+		// 技能名稱（首字母）
+		const text = this.add.text(x, y - 10, skill.name.charAt(0), {
+			fontSize: `${fontSize}px`,
+			color: canBuy ? '#ffffff' : '#888888',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+		text.setOrigin(0.5);
+
+		// 價格
+		const priceText = this.add.text(x, y + 15, `$${skill.price.toLocaleString()}`, {
+			fontSize: `${fontSize}px`,
+			color: canAfford ? priceColor : '#ff6666',
+			fontFamily: 'Arial'
+		});
+		priceText.setOrigin(0.5);
+
+		// 互動
+		if (canBuy) {
+			background.setInteractive({ useHandCursor: true });
+
+			background.on('pointerover', () => {
+				background.setStrokeStyle(3, COLORS.buttonHover);
+			});
+
+			background.on('pointerout', () => {
+				background.setStrokeStyle(2, COLORS.buttonStroke);
+			});
+
+			background.on('pointerdown', () => {
+				this.buySkill(skill.id);
+			});
+		}
+	}
+
+	/**
+	 * 購買技能
+	 */
+	private buySkill(skillId: string) {
+		const success = this.gameState.buySkill(skillId);
+
+		if (success) {
+			const skill = this.gameState.playerStats.skills.getSkill(skillId);
+			console.log(`[商店] 購買技能 ${skill?.name}`);
+			this.refreshUI();
+		} else {
+			console.log('[商店] 購買失敗：點數不足或已學習');
+		}
+	}
+
+	/**
 	 * 建立屬性升級區域
 	 */
 	private createAttributeUpgrade() {
-		// 計算道具欄區域結束位置：290 + 20(標題) + 50(道具格) + 20(狀態) = 380
-		const startY = 390; // 預留10px間距
+		// 計算技能商店區域結束位置：390 + 30(標題) + 最多1行技能(70+20) = 510
+		const startY = 520; // 預留10px間距
 		const padding = SHOP.padding;
 		const titleHeight = 20;
 		const rowHeight = 32; // 稍微縮小行高以節省空間
@@ -480,9 +583,9 @@ export class SupplyScene extends Phaser.Scene {
 	 * 建立下一關按鈕
 	 */
 	private createNextButton() {
-		// 計算屬性升級區域結束位置：390 + 20(標題) + 2行(32*2) = 474
+		// 計算屬性升級區域結束位置：520 + 20(標題) + 2行(32*2) = 604
 		// 預留空間給按鈕，確保不重疊
-		const buttonY = GAME_HEIGHT - 40;
+		const buttonY = GAME_HEIGHT - 30;
 
 		// 按鈕背景
 		const button = this.add.rectangle(GAME_WIDTH / 2, buttonY, 120, 40, COLORS.button);
