@@ -530,9 +530,21 @@ export class MainScene extends Phaser.Scene {
 	 * 使用道具
 	 */
 	private useItemAtSlot(index: number) {
+		// 記錄使用前的血量
+		const oldHealth = this.playerStats.currentHealth;
+		
 		if (this.playerStats.useItem(index)) {
+			// 計算回復量
+			const healAmount = this.playerStats.currentHealth - oldHealth;
+			
 			this.updateHealthBar(this.playerHealthBar, this.playerStats);
 			this.flashEffect(this.player, 0x00ff00);
+			
+			// 顯示回復數字（如果有回復）
+			if (healAmount > 0) {
+				this.showDamageNumber(this.player.x, this.player.y, healAmount, false, true);
+			}
+			
 			this.updateItemSlots();
 
 			if (this.isDrawerOpen) {
@@ -711,6 +723,11 @@ export class MainScene extends Phaser.Scene {
 		this.updateHealthBar(target.healthBar, target.stats);
 		this.flashEffect(target.gameObject, 0xffffff);
 
+		// 顯示傷害數字
+		const enemyX = target.gameObject.x;
+		const enemyY = target.gameObject.y;
+		this.showDamageNumber(enemyX, enemyY, actualDamage, isCritical, false);
+
 		console.log(
 			`[玩家攻擊] ${target.instance.name} ${isCritical ? '💥暴擊！' : ''} 傷害: ${damage.toFixed(1)} → 實際: ${actualDamage.toFixed(1)}`
 		);
@@ -740,6 +757,9 @@ export class MainScene extends Phaser.Scene {
 			this.updateHealthBar(this.playerHealthBar, this.playerStats);
 			this.flashEffect(this.player, 0xff0000);
 
+			// 顯示傷害數字
+			this.showDamageNumber(this.player.x, this.player.y, actualDamage, isCritical, false);
+
 			console.log(
 				`[${enemy.instance.name}攻擊] ${isCritical ? '💥暴擊！' : ''} 傷害: ${damage.toFixed(1)} → 實際: ${actualDamage.toFixed(1)}`
 			);
@@ -752,13 +772,29 @@ export class MainScene extends Phaser.Scene {
 	 * 回合結束效果
 	 */
 	private applyEndOfTurnEffects() {
+		// 玩家回復
+		const playerOldHealth = this.playerStats.currentHealth;
 		this.playerStats.applyRegeneration();
+		const playerHealAmount = this.playerStats.currentHealth - playerOldHealth;
 		this.updateHealthBar(this.playerHealthBar, this.playerStats);
+		
+		// 顯示玩家回復數字（如果有回復）
+		if (playerHealAmount > 0) {
+			this.showDamageNumber(this.player.x, this.player.y, playerHealAmount, false, true);
+		}
 
+		// 敵人回復
 		for (const enemy of this.enemies) {
 			if (enemy.isAlive) {
+				const enemyOldHealth = enemy.stats.currentHealth;
 				enemy.stats.applyRegeneration();
+				const enemyHealAmount = enemy.stats.currentHealth - enemyOldHealth;
 				this.updateHealthBar(enemy.healthBar, enemy.stats);
+				
+				// 顯示敵人回復數字（如果有回復）
+				if (enemyHealAmount > 0) {
+					this.showDamageNumber(enemy.gameObject.x, enemy.gameObject.y, enemyHealAmount, false, true);
+				}
 			}
 		}
 
@@ -933,6 +969,94 @@ export class MainScene extends Phaser.Scene {
 			target.setFillStyle(color);
 			this.time.delayedCall(100, () => {
 				target.setFillStyle(originalColor);
+			});
+		}
+	}
+
+	/**
+	 * 顯示傷害數字
+	 * @param x X 座標
+	 * @param y Y 座標
+	 * @param damage 傷害值
+	 * @param isCritical 是否為暴擊
+	 * @param isHeal 是否為回復（預設為 false，表示傷害）
+	 */
+	private showDamageNumber(
+		x: number,
+		y: number,
+		damage: number,
+		isCritical: boolean = false,
+		isHeal: boolean = false
+	) {
+		// 格式化數字（整數顯示，小數點後一位）
+		const damageText = damage.toFixed(damage % 1 === 0 ? 0 : 1);
+		const prefix = isHeal ? '+' : '-';
+
+		// 根據類型設定顏色和大小
+		let color: string;
+		let fontSize: number;
+		let offsetY: number; // 垂直偏移（暴擊時稍微向上）
+
+		if (isHeal) {
+			// 回復：綠色
+			color = '#00ff00';
+			fontSize = isCritical ? 24 : 18;
+			offsetY = isCritical ? -10 : 0;
+		} else if (isCritical) {
+			// 暴擊傷害：金色，更大
+			color = '#ffcc00';
+			fontSize = 24;
+			offsetY = -10;
+		} else {
+			// 普通傷害：白色
+			color = '#ffffff';
+			fontSize = 18;
+			offsetY = 0;
+		}
+
+		// 建立文字物件
+		const text = this.add.text(x, y + offsetY, `${prefix}${damageText}`, {
+			fontSize: `${fontSize}px`,
+			color: color,
+			fontFamily: 'Arial',
+			fontStyle: 'bold',
+			stroke: '#000000',
+			strokeThickness: 3
+		});
+		text.setOrigin(0.5);
+		text.setDepth(200); // 確保在最上層
+
+		// 浮動動畫：向上移動並淡出
+		const duration = isCritical ? 1000 : 800;
+		const distance = isCritical ? 60 : 40;
+
+		// 向上移動
+		this.tweens.add({
+			targets: text,
+			y: y + offsetY - distance,
+			duration: duration,
+			ease: 'Power2'
+		});
+
+		// 淡出
+		this.tweens.add({
+			targets: text,
+			alpha: 0,
+			duration: duration,
+			ease: 'Power2',
+			onComplete: () => {
+				text.destroy();
+			}
+		});
+
+		// 暴擊時額外效果：稍微放大再縮小
+		if (isCritical) {
+			text.setScale(1.5);
+			this.tweens.add({
+				targets: text,
+				scale: 1.0,
+				duration: 200,
+				ease: 'Back.easeOut'
 			});
 		}
 	}
