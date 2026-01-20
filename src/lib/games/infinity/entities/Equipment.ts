@@ -24,7 +24,10 @@ export enum ArmorType {
  * 道具類型
  */
 export enum ItemType {
-	HealthPotion = 'health_potion'
+	HealthPotionD = 'health_potion_d', // D級血瓶
+	HealthPotionC = 'health_potion_c', // C級血瓶
+	HealthPotionB = 'health_potion_b', // B級血瓶
+	HealthPotionA = 'health_potion_a' // A級血瓶
 }
 
 /**
@@ -54,6 +57,8 @@ export interface Item {
 	type: ItemType;
 	name: string;
 	nameEn: string;
+	/** 回復百分比（0-1），例如 0.25 表示回復 25% 最大血量 */
+	healPercent?: number;
 	effect: (stats: any) => void; // 使用效果函數
 }
 
@@ -106,20 +111,49 @@ export const ARMORS: Record<ArmorType, Armor> = {
 };
 
 /**
+ * 建立血瓶效果函數
+ * @param healPercent 回復百分比（0-1）
+ */
+function createHealthPotionEffect(healPercent: number) {
+	return (stats: { currentHealth: number; derived: { healthPoints: number } }) => {
+		const maxHealth = stats.derived.healthPoints;
+		const healAmount = maxHealth * healPercent;
+		// 不會溢補，最多回復到最大血量
+		stats.currentHealth = Math.min(stats.currentHealth + healAmount, maxHealth);
+	};
+}
+
+/**
  * 道具資料庫
  */
 export const ITEMS: Record<ItemType, Item> = {
-	[ItemType.HealthPotion]: {
-		type: ItemType.HealthPotion,
-		name: '血瓶',
-		nameEn: 'Health Potion',
-		effect: (stats: { currentHealth: number; derived: { healthPoints: number } }) => {
-			// 回復 50 點血量，可超過上限
-			stats.currentHealth = Math.min(
-				stats.currentHealth + 50,
-				stats.derived.healthPoints + 50
-			);
-		}
+	[ItemType.HealthPotionD]: {
+		type: ItemType.HealthPotionD,
+		name: 'D級血瓶',
+		nameEn: 'Health Potion (D)',
+		healPercent: 0.25,
+		effect: createHealthPotionEffect(0.25)
+	},
+	[ItemType.HealthPotionC]: {
+		type: ItemType.HealthPotionC,
+		name: 'C級血瓶',
+		nameEn: 'Health Potion (C)',
+		healPercent: 0.5,
+		effect: createHealthPotionEffect(0.5)
+	},
+	[ItemType.HealthPotionB]: {
+		type: ItemType.HealthPotionB,
+		name: 'B級血瓶',
+		nameEn: 'Health Potion (B)',
+		healPercent: 0.75,
+		effect: createHealthPotionEffect(0.75)
+	},
+	[ItemType.HealthPotionA]: {
+		type: ItemType.HealthPotionA,
+		name: 'A級血瓶',
+		nameEn: 'Health Potion (A)',
+		healPercent: 1.0,
+		effect: createHealthPotionEffect(1.0)
 	}
 };
 

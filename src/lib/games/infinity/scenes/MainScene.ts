@@ -370,14 +370,14 @@ export class MainScene extends Phaser.Scene {
 	 * 初始化玩家和敵人的角色狀態
 	 */
 	private initializeStats() {
-		// 玩家：使用預設屬性，裝備木劍和布甲，初始擁有 1 瓶血瓶
+		// 玩家：使用預設屬性，裝備木劍和布甲，初始擁有 1 瓶 D 級血瓶
 		this.playerStats = new CharacterStats(
 			{}, // 使用預設主屬性
 			{}, // 不使用舊的裝備加成系統
 			{
 				weapon: createDefaultWeapon(), // 木劍 (+5 攻擊)
 				armor: createDefaultArmor(), // 布甲 (+1 防禦)
-				items: [ITEMS[ItemType.HealthPotion]], // 初始 1 瓶血瓶
+				items: [ITEMS[ItemType.HealthPotionD]], // 初始 1 瓶 D 級血瓶（補血 25%）
 				maxItemSlots: 1 // 初始道具欄位 1 格
 			}
 		);
