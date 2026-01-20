@@ -121,3 +121,14 @@ export const ITEM_SLOTS = {
 	padding: 10, // 距離邊緣的間距
 	strokeWidth: 2
 } as const;
+
+// 商店設定
+export const SHOP = {
+	itemSize: 70, // 商品格子大小
+	itemGap: 10, // 商品間距
+	padding: 20, // 邊距
+	fontSize: 12,
+	titleFontSize: 18,
+	priceColor: '#ffcc00', // 金幣顏色
+	disabledColor: 0x555555 // 不可購買時的顏色
+} as const;

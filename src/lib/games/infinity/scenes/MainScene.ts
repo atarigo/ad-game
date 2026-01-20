@@ -19,6 +19,7 @@ import {
 	createDefaultArmor,
 	createDefaultWeapon
 } from '../entities';
+import { GameState } from '../state';
 
 // 血量條結構
 interface HealthBar {
@@ -69,6 +70,10 @@ export class MainScene extends Phaser.Scene {
 
 	// 道具格
 	private itemSlots: ItemSlot[] = [];
+
+	// 遊戲狀態
+	private gameState!: GameState;
+	private stageInfoText!: Phaser.GameObjects.Text;
 
 	constructor() {
 		super({ key: 'MainScene' });
@@ -506,17 +511,11 @@ export class MainScene extends Phaser.Scene {
 	 * 初始化玩家和敵人的角色狀態
 	 */
 	private initializeStats() {
-		// 玩家：使用預設屬性，裝備木劍和布甲，初始擁有 1 瓶 D 級血瓶
-		this.playerStats = new CharacterStats(
-			{}, // 使用預設主屬性
-			{}, // 不使用舊的裝備加成系統
-			{
-				weapon: createDefaultWeapon(), // 木劍 (+5 攻擊)
-				armor: createDefaultArmor(), // 布甲 (+1 防禦)
-				items: [ITEMS[ItemType.HealthPotionD]], // 初始 1 瓶 D 級血瓶（補血 25%）
-				maxItemSlots: 1 // 初始道具欄位 1 格
-			}
-		);
+		// 取得遊戲狀態
+		this.gameState = GameState.getInstance();
+
+		// 玩家狀態從 GameState 取得（跨場景保留）
+		this.playerStats = this.gameState.playerStats;
 
 		// 敵人：使用預設屬性，裝備木劍和布甲，無道具
 		this.enemyStats = new CharacterStats(
@@ -531,6 +530,9 @@ export class MainScene extends Phaser.Scene {
 		);
 
 		// 輸出狀態到控制台供測試
+		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
+		console.log(`[遊戲] ${currentMapLevel}級地圖 第${currentStage}關（${currentStageNumber}/15）`);
+
 		console.log('Player Stats:', {
 			primary: this.playerStats.primary,
 			weapon: this.playerStats.weapon?.name,
@@ -556,6 +558,21 @@ export class MainScene extends Phaser.Scene {
 	 */
 	private createUI() {
 		const { width, height, padding, strokeWidth, fontSize } = UI_BUTTON;
+
+		// 關卡資訊（頂部）
+		const { currentMapLevel, currentStage, currentStageNumber } = this.gameState;
+		this.stageInfoText = this.add.text(
+			GAME_WIDTH / 2,
+			15,
+			`${currentMapLevel}級 - ${currentStage}/3（${currentStageNumber}/15）`,
+			{
+				fontSize: '12px',
+				color: '#aaaaaa',
+				fontFamily: 'Arial'
+			}
+		);
+		this.stageInfoText.setOrigin(0.5);
+		this.stageInfoText.setDepth(50);
 
 		// 按鈕位置（左下角）
 		const buttonX = padding + width / 2;
@@ -970,6 +987,21 @@ export class MainScene extends Phaser.Scene {
 		this.enemyHealthBar.background.setVisible(false);
 		this.enemyHealthBar.fill.setVisible(false);
 		this.closeDrawer(); // 關閉抽屜
+
+		// 顯示勝利訊息
+		const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '勝利！', {
+			fontSize: '32px',
+			color: '#00ff00',
+			fontFamily: 'Arial',
+			fontStyle: 'bold'
+		});
+		victoryText.setOrigin(0.5);
+		victoryText.setDepth(100);
+
+		// 延遲後進入補給場景
+		this.time.delayedCall(1500, () => {
+			this.scene.start('SupplyScene');
+		});
 	}
 
 	/**

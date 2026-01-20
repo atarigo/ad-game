@@ -7,6 +7,11 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 	// 動態載入 Phaser，避免 SSR 問題
 	const Phaser = await import('phaser');
 	const { MainScene } = await import('./scenes/MainScene');
+	const { SupplyScene } = await import('./scenes/SupplyScene');
+
+	// 重置遊戲狀態
+	const { GameState } = await import('./state');
+	GameState.reset();
 
 	const config: Phaser.Types.Core.GameConfig = {
 		type: Phaser.AUTO,
@@ -14,7 +19,7 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 		height: GAME_HEIGHT,
 		parent,
 		backgroundColor: COLORS.background,
-		scene: MainScene,
+		scene: [MainScene, SupplyScene], // 註冊所有場景
 		scale: {
 			mode: Phaser.Scale.FIT,
 			autoCenter: Phaser.Scale.CENTER_BOTH
