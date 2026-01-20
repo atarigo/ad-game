@@ -62,10 +62,10 @@
 ### 優先度：高 🔴
 
 #### 貨幣系統
-- [ ] 金幣獲取（戰鬥獎勵）
-- [ ] 金幣消耗（商店購買）
-- [ ] 金幣顯示 UI
-- [ ] 設定物品價格
+- [x] 金幣獲取（戰鬥獎勵）
+- [x] 金幣消耗（商店購買）
+- [x] 金幣顯示 UI
+- [x] 設定物品價格
 
 #### 傷害數字顯示
 - [x] 攻擊時顯示傷害數字
@@ -250,28 +250,28 @@ type WinCondition =
 ```
 
 #### 0.4 點數/獎勵系統
-- [ ] GameState 加入 `points: number`
-- [ ] 擊倒敵人獲得點數
-- [ ] 完成波次獲得獎勵
-- [ ] UI 顯示點數
-- [ ] 15% 機率掉落裝備
+- [x] GameState 加入 `points: number`
+- [x] 擊倒敵人獲得點數
+- [x] 完成波次獲得獎勵
+- [x] UI 顯示點數
+- [ ] 15% 機率掉落裝備（移至次要功能）
 
 ---
 
 ### 階段 1：系統抽離
 
 #### 1.1 BattleManager
-- [ ] 建立 `systems/BattleManager.ts`
-- [ ] 抽離攻擊/傷害計算
-- [ ] 抽離回合管理
-- [ ] 事件回調（onDamage, onDefeat 等）
-- [ ] MainScene 只負責渲染
+- [x] 建立 `systems/BattleManager.ts`
+- [x] 抽離攻擊/傷害計算
+- [x] 抽離回合管理
+- [x] 事件回調（onDamage, onDefeat 等）
+- [ ] MainScene 只負責渲染（部分完成，仍有部分邏輯在 MainScene）
 
 #### 1.2 WaveManager
-- [ ] 建立 `systems/WaveManager.ts`
-- [ ] 管理波次流程
-- [ ] 勝利條件檢查
-- [ ] 波次切換邏輯
+- [x] 建立 `systems/WaveManager.ts`
+- [x] 管理波次流程
+- [x] 勝利條件檢查
+- [x] 波次切換邏輯
 
 #### 1.3 ProgressManager
 - [x] 建立 `systems/ProgressManager.ts`

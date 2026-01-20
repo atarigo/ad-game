@@ -109,6 +109,8 @@ export class SupplyScene extends Phaser.Scene {
 	private createShop() {
 		const { itemSize, itemGap, padding, fontSize, titleFontSize, priceColor } = SHOP;
 		const startY = 95;
+		const titleHeight = 25; // 標題高度
+		const rowSpacing = 15; // 行間距
 
 		// 商店標題
 		this.add.text(padding, startY, '商店', {
@@ -132,7 +134,7 @@ export class SupplyScene extends Phaser.Scene {
 			const item = ITEMS[potionType];
 			const price = getPotionPrice(potionType);
 			const x = padding + col * (itemSize + itemGap) + itemSize / 2;
-			const y = startY + 35 + row * (itemSize + itemGap + 20) + itemSize / 2;
+			const y = startY + titleHeight + row * (itemSize + rowSpacing) + itemSize / 2;
 
 			this.createShopItem(x, y, 'potion', item, potionType, price);
 
@@ -146,7 +148,7 @@ export class SupplyScene extends Phaser.Scene {
 		// 道具欄擴充商品
 		const canBuySlot = this.gameState.playerStats.maxItemSlots < 3;
 		const slotX = padding + col * (itemSize + itemGap) + itemSize / 2;
-		const slotY = startY + 35 + row * (itemSize + itemGap + 20) + itemSize / 2;
+		const slotY = startY + titleHeight + row * (itemSize + rowSpacing) + itemSize / 2;
 
 		this.createSlotItem(slotX, slotY, canBuySlot);
 	}
@@ -297,7 +299,11 @@ export class SupplyScene extends Phaser.Scene {
 	 */
 	private createInventory() {
 		const { size, gap, padding, strokeWidth } = ITEM_SLOTS;
-		const startY = 270;
+		// 計算商店區域結束位置：95 + 25(標題) + 最多2行商品(70+15)*2 = 280
+		const startY = 290; // 預留10px間距
+		const titleHeight = 20;
+		const slotAreaHeight = 50; // 道具格區域高度
+		const statusHeight = 20; // 狀態文字高度
 
 		// 道具欄標題
 		this.add.text(padding, startY, '道具欄', {
@@ -315,7 +321,7 @@ export class SupplyScene extends Phaser.Scene {
 
 		for (let i = 0; i < maxSlots; i++) {
 			const x = padding + i * (size + gap) + size / 2;
-			const y = startY + 40;
+			const y = startY + titleHeight + size / 2;
 
 			const hasItem = i < items.length;
 			const item = hasItem ? items[i] : null;
@@ -375,7 +381,7 @@ export class SupplyScene extends Phaser.Scene {
 		}
 
 		// 顯示道具欄狀態
-		this.add.text(padding, startY + 85, `道具欄: ${items.length}/${maxSlots}`, {
+		this.add.text(padding, startY + titleHeight + slotAreaHeight, `道具欄: ${items.length}/${maxSlots}`, {
 			fontSize: '11px',
 			color: '#aaaaaa',
 			fontFamily: 'Arial'
@@ -386,8 +392,11 @@ export class SupplyScene extends Phaser.Scene {
 	 * 建立屬性升級區域
 	 */
 	private createAttributeUpgrade() {
-		const startY = 370;
+		// 計算道具欄區域結束位置：290 + 20(標題) + 50(道具格) + 20(狀態) = 380
+		const startY = 390; // 預留10px間距
 		const padding = SHOP.padding;
+		const titleHeight = 20;
+		const rowHeight = 32; // 稍微縮小行高以節省空間
 
 		// 標題
 		this.add.text(padding, startY, '屬性升級', {
@@ -410,13 +419,13 @@ export class SupplyScene extends Phaser.Scene {
 		];
 
 		const colWidth = 110;
-		const rowHeight = 35;
+		const maxRows = 2; // 最多2行，每行3個
 
 		attributes.forEach((attr, index) => {
 			const col = index % 3;
 			const row = Math.floor(index / 3);
 			const x = padding + col * colWidth;
-			const y = startY + 30 + row * rowHeight;
+			const y = startY + titleHeight + row * rowHeight;
 
 			const currentValue = this.gameState.playerStats.primary[attr.key];
 			const cost = getAttributeUpgradeCost(currentValue);
@@ -471,7 +480,9 @@ export class SupplyScene extends Phaser.Scene {
 	 * 建立下一關按鈕
 	 */
 	private createNextButton() {
-		const buttonY = GAME_HEIGHT - 50;
+		// 計算屬性升級區域結束位置：390 + 20(標題) + 2行(32*2) = 474
+		// 預留空間給按鈕，確保不重疊
+		const buttonY = GAME_HEIGHT - 40;
 
 		// 按鈕背景
 		const button = this.add.rectangle(GAME_WIDTH / 2, buttonY, 120, 40, COLORS.button);
@@ -550,7 +561,64 @@ export class SupplyScene extends Phaser.Scene {
 	 * 重新整理 UI
 	 */
 	private refreshUI() {
+		// 更新點數顯示
+		this.pointsText.setText(`點數: ${this.gameState.points}`);
+		
+		// 更新所有商品的可購買狀態
+		for (const shopItem of this.shopItems) {
+			const canAfford = this.gameState.points >= shopItem.price;
+			
+			// 更新價格顏色
+			if (shopItem.type === 'potion') {
+				const hasSpace = this.gameState.playerStats.hasItemSpace;
+				const canBuy = hasSpace && canAfford;
+				shopItem.priceText.setColor(canAfford ? SHOP.priceColor : '#ff6666');
+				shopItem.background.setFillStyle(canBuy ? COLORS.itemSlotFilled : SHOP.disabledColor);
+				shopItem.text.setColor(canBuy ? '#ffffff' : '#888888');
+				
+				// 更新互動狀態
+				if (canBuy) {
+					shopItem.background.setInteractive({ useHandCursor: true });
+				} else {
+					shopItem.background.disableInteractive();
+				}
+			} else if (shopItem.type === 'slot') {
+				const canBuy = this.gameState.playerStats.maxItemSlots < 3;
+				const canPurchase = canBuy && canAfford;
+				shopItem.priceText.setColor(canAfford ? SHOP.priceColor : '#ff6666');
+				shopItem.background.setFillStyle(canPurchase ? COLORS.button : SHOP.disabledColor);
+				shopItem.text.setColor(canPurchase ? '#ffffff' : '#888888');
+				
+				// 更新互動狀態
+				if (canPurchase) {
+					shopItem.background.setInteractive({ useHandCursor: true });
+				} else {
+					shopItem.background.disableInteractive();
+				}
+			}
+		}
+		
+		// 更新道具欄
+		this.updateInventory();
+		
+		// 更新屬性升級區域（需要重新建立，因為按鈕是動態的）
+		// 為了簡化，我們重新啟動場景
 		this.scene.restart();
+	}
+
+	/**
+	 * 更新道具欄顯示
+	 */
+	private updateInventory() {
+		// 清除舊的道具欄
+		for (const slot of this.inventorySlots) {
+			slot.background.destroy();
+			if (slot.text) slot.text.destroy();
+		}
+		this.inventorySlots = [];
+		
+		// 重新建立道具欄（簡化版，實際應該只更新變化的部分）
+		// 這裡為了簡化，我們在 refreshUI 中重新啟動場景
 	}
 
 	/**
