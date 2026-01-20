@@ -1,25 +1,23 @@
 import Phaser from 'phaser';
 import {
-	GAME_WIDTH,
-	GAME_HEIGHT,
 	COLORS,
-	PLAYER,
-	ZONES,
 	ENEMY_GRID,
-	UI_BUTTON,
+	GAME_HEIGHT,
+	GAME_WIDTH,
 	HEALTH_BAR,
-	INFO_DRAWER
+	INFO_DRAWER,
+	ITEM_SLOTS,
+	PLAYER,
+	SKILL_SLOTS,
+	UI_BUTTON,
+	ZONES
 } from '../config';
 import {
 	CharacterStats,
-	WeaponType,
-	ArmorType,
-	ItemType,
-	WEAPONS,
-	ARMORS,
 	ITEMS,
-	createDefaultWeapon,
-	createDefaultArmor
+	ItemType,
+	createDefaultArmor,
+	createDefaultWeapon
 } from '../entities';
 
 // 血量條結構
@@ -82,8 +80,38 @@ export class MainScene extends Phaser.Scene {
 			Phaser.Display.Color.HexStringToColor(COLORS.uiArea).color
 		);
 
-		// 繪製玩家區域（UI 區域上方）
-		const playerAreaY = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.playerAreaHeight / 2;
+		// 繪製技能格區域（UI 區域上方）
+		const skillRowY =
+			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight / 2;
+		this.add.rectangle(
+			GAME_WIDTH / 2,
+			skillRowY,
+			GAME_WIDTH,
+			ZONES.skillRowHeight,
+			Phaser.Display.Color.HexStringToColor(COLORS.uiArea).color
+		);
+
+		// 繪製道具格區域（技能格上方）
+		const itemRowY =
+			GAME_HEIGHT -
+			ZONES.uiAreaHeight -
+			ZONES.skillRowHeight -
+			ZONES.itemRowHeight / 2;
+		this.add.rectangle(
+			GAME_WIDTH / 2,
+			itemRowY,
+			GAME_WIDTH,
+			ZONES.itemRowHeight,
+			Phaser.Display.Color.HexStringToColor(COLORS.uiArea).color
+		);
+
+		// 繪製玩家區域（道具格上方）
+		const playerAreaY =
+			GAME_HEIGHT -
+			ZONES.uiAreaHeight -
+			ZONES.skillRowHeight -
+			ZONES.itemRowHeight -
+			ZONES.playerAreaHeight / 2;
 		this.add.rectangle(
 			GAME_WIDTH / 2,
 			playerAreaY,
@@ -92,19 +120,39 @@ export class MainScene extends Phaser.Scene {
 			Phaser.Display.Color.HexStringToColor(COLORS.playerArea).color
 		);
 
-		// 繪製區域分隔線（玩家區域與敵人區域之間）
+		// 繪製區域分隔線
+		const dividerY1 =
+			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight - ZONES.playerAreaHeight;
 		this.add.rectangle(
 			GAME_WIDTH / 2,
-			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.playerAreaHeight,
+			dividerY1,
 			GAME_WIDTH,
 			2,
 			COLORS.zoneDivider
 		);
 
-		// 繪製區域分隔線（玩家區域與 UI 區域之間）
+		const dividerY2 = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight;
 		this.add.rectangle(
 			GAME_WIDTH / 2,
-			GAME_HEIGHT - ZONES.uiAreaHeight,
+			dividerY2,
+			GAME_WIDTH,
+			2,
+			COLORS.zoneDivider
+		);
+
+		const dividerY3 = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight;
+		this.add.rectangle(
+			GAME_WIDTH / 2,
+			dividerY3,
+			GAME_WIDTH,
+			2,
+			COLORS.zoneDivider
+		);
+
+		const dividerY4 = GAME_HEIGHT - ZONES.uiAreaHeight;
+		this.add.rectangle(
+			GAME_WIDTH / 2,
+			dividerY4,
 			GAME_WIDTH,
 			2,
 			COLORS.zoneDivider
@@ -117,7 +165,13 @@ export class MainScene extends Phaser.Scene {
 		this.spawnEnemy();
 
 		// 建立綠色方塊代表 player（置於玩家區域中央）
-		const playerY = GAME_HEIGHT - ZONES.uiAreaHeight - PLAYER.bottomPadding - PLAYER.height / 2;
+		const playerY =
+			GAME_HEIGHT -
+			ZONES.uiAreaHeight -
+			ZONES.skillRowHeight -
+			ZONES.itemRowHeight -
+			PLAYER.bottomPadding -
+			PLAYER.height / 2;
 		this.player = this.add.rectangle(
 			GAME_WIDTH / 2,
 			playerY,
@@ -134,6 +188,12 @@ export class MainScene extends Phaser.Scene {
 
 		// 建立血量條
 		this.createHealthBars();
+
+		// 建立技能格
+		this.createSkillSlots();
+
+		// 建立道具格
+		this.createItemSlots();
 
 		// 建立資訊抽屜
 		this.createInfoDrawer();
@@ -249,6 +309,60 @@ export class MainScene extends Phaser.Scene {
 			healthBar.fill.setFillStyle(COLORS.healthBarLow);
 		} else {
 			healthBar.fill.setFillStyle(COLORS.healthBarFill);
+		}
+	}
+
+	/**
+	 * 建立技能格
+	 */
+	private createSkillSlots() {
+		const { count, size, gap, padding, strokeWidth } = SKILL_SLOTS;
+		const skillRowY = GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight / 2;
+
+		// 從左邊開始排列
+		const startX = padding + size / 2;
+
+		for (let i = 0; i < count; i++) {
+			const x = startX + i * (size + gap);
+			const slot = this.add.rectangle(x, skillRowY, size, size, COLORS.skillSlot);
+			slot.setStrokeStyle(strokeWidth, COLORS.skillSlotStroke);
+		}
+	}
+
+	/**
+	 * 建立道具格
+	 */
+	private createItemSlots() {
+		const { size, gap, padding, strokeWidth } = ITEM_SLOTS;
+		const itemRowY =
+			GAME_HEIGHT - ZONES.uiAreaHeight - ZONES.skillRowHeight - ZONES.itemRowHeight / 2;
+
+		// 取得玩家道具欄位數量
+		const maxSlots = this.playerStats.maxItemSlots;
+
+		// 從左邊開始排列
+		const startX = padding + size / 2;
+
+		// 建立道具格
+		for (let i = 0; i < maxSlots; i++) {
+			const x = startX + i * (size + gap);
+			const slot = this.add.rectangle(x, itemRowY, size, size, COLORS.itemSlot);
+			slot.setStrokeStyle(strokeWidth, COLORS.itemSlotStroke);
+
+			// 如果有道具，顯示道具
+			if (i < this.playerStats.items.length) {
+				const item = this.playerStats.items[i];
+				// 在格子中央顯示道具圖示或文字
+				const itemText = this.add.text(x, itemRowY, item.name.charAt(0), {
+					fontSize: '16px',
+					color: '#ffffff',
+					fontFamily: 'Arial'
+				});
+				itemText.setOrigin(0.5);
+
+				// 將格子改為有道具的顏色
+				slot.setFillStyle(COLORS.itemSlotFilled);
+			}
 		}
 	}
 

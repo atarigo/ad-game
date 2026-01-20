@@ -6,11 +6,21 @@ export const GAME_HEIGHT = 640;
 export const ZONES = {
 	// UI 區域（最底部）
 	uiAreaHeight: 60,
-	// 玩家區域（中下方）
+	// 技能格區域（UI 上方）
+	skillRowHeight: 50,
+	// 道具格區域（技能格上方）
+	itemRowHeight: 50,
+	// 玩家區域（道具格上方）
 	playerAreaHeight: 120,
 	// 敵人區域（上方）
 	get enemyAreaHeight() {
-		return GAME_HEIGHT - this.playerAreaHeight - this.uiAreaHeight;
+		return (
+			GAME_HEIGHT -
+			this.playerAreaHeight -
+			this.itemRowHeight -
+			this.skillRowHeight -
+			this.uiAreaHeight
+		);
 	}
 } as const;
 
@@ -35,7 +45,13 @@ export const COLORS = {
 	healthBarBackground: 0x333333,
 	healthBarFill: 0x00ff00,
 	healthBarLow: 0xff0000, // 血量低於 30% 時顯示紅色
-	healthBarStroke: 0x000000
+	healthBarStroke: 0x000000,
+	// 技能格和道具格
+	skillSlot: 0x2a4a2a, // 技能格背景
+	skillSlotStroke: 0x3d5a3d, // 技能格邊框
+	itemSlot: 0x2a4a2a, // 道具格背景
+	itemSlotStroke: 0x3d5a3d, // 道具格邊框
+	itemSlotFilled: 0x4a6a4a // 有道具的格子
 } as const;
 
 // 玩家設定
@@ -87,4 +103,21 @@ export const INFO_DRAWER = {
 	textColor: '#ffffff',
 	labelColor: '#aaaaaa',
 	equipmentColor: '#4a9eff' // 裝備文字顏色
+} as const;
+
+// 技能格設定
+export const SKILL_SLOTS = {
+	count: 3, // 技能格數量
+	size: 40, // 格子大小
+	gap: 8, // 格子間距
+	padding: 10, // 距離邊緣的間距
+	strokeWidth: 2
+} as const;
+
+// 道具格設定
+export const ITEM_SLOTS = {
+	size: 40, // 格子大小
+	gap: 8, // 格子間距
+	padding: 10, // 距離邊緣的間距
+	strokeWidth: 2
 } as const;
