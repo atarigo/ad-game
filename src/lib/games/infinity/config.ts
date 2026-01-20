@@ -4,11 +4,13 @@ export const GAME_HEIGHT = 640;
 
 // 區域設定
 export const ZONES = {
-	// 玩家區域（底部）
+	// UI 區域（最底部）
+	uiAreaHeight: 60,
+	// 玩家區域（中下方）
 	playerAreaHeight: 120,
 	// 敵人區域（上方）
 	get enemyAreaHeight() {
-		return GAME_HEIGHT - this.playerAreaHeight;
+		return GAME_HEIGHT - this.playerAreaHeight - this.uiAreaHeight;
 	}
 } as const;
 
@@ -16,13 +18,24 @@ export const ZONES = {
 export const COLORS = {
 	background: '#1a4d1a', // 深綠色背景（敵人區域）
 	playerArea: '#0d260d', // 更深的綠色（玩家區域）
+	uiArea: '#0a1a0a', // 最深的綠色（UI 區域）
 	player: 0x00ff00, // 亮綠色
 	playerStroke: 0x00aa00, // 玩家邊框
 	zoneDivider: 0x2d5a2d, // 區域分隔線
 	enemySlot: 0x143d14, // 敵人格子填充
 	enemySlotStroke: 0x2d5a2d, // 敵人格子邊框
 	enemy: 0xff0000, // 紅色敵人
-	enemyStroke: 0xaa0000 // 敵人邊框
+	enemyStroke: 0xaa0000, // 敵人邊框
+	// UI 按鈕
+	button: 0x2d5a2d,
+	buttonHover: 0x3d7a3d,
+	buttonStroke: 0x4a8a4a,
+	buttonText: 0xffffff,
+	// 血量條
+	healthBarBackground: 0x333333,
+	healthBarFill: 0x00ff00,
+	healthBarLow: 0xff0000, // 血量低於 30% 時顯示紅色
+	healthBarStroke: 0x000000
 } as const;
 
 // 玩家設定
@@ -42,4 +55,22 @@ export const ENEMY_GRID = {
 	gap: 12, // 格子間距
 	topPadding: 40, // 距離頂部的間距
 	strokeWidth: 2
+} as const;
+
+// UI 按鈕設定
+export const UI_BUTTON = {
+	width: 80,
+	height: 40,
+	padding: 10, // 距離邊緣的間距
+	strokeWidth: 2,
+	fontSize: 14
+} as const;
+
+// 血量條設定
+export const HEALTH_BAR = {
+	width: 40, // 血量條寬度
+	height: 6, // 血量條高度
+	offsetY: 8, // 距離角色頭部的距離
+	strokeWidth: 1,
+	lowHealthThreshold: 0.3 // 低血量閾值（30%）
 } as const;
