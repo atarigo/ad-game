@@ -860,10 +860,18 @@ export class MainScene extends Phaser.Scene {
 	private onStageComplete() {
 		console.log('🎉 關卡完成！');
 
+		// 使用 ProgressManager 處理進度
+		const result = this.gameState.nextStage();
+
 		// 顯示勝利訊息
-		const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, '關卡通關！', {
+		let victoryMessage = '關卡通關！';
+		if (result.promoted && result.newTier) {
+			victoryMessage = `🎉 晉級到 ${result.newTier} 級！`;
+		}
+
+		const victoryText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, victoryMessage, {
 			fontSize: '32px',
-			color: '#00ff00',
+			color: result.promoted ? '#ffcc00' : '#00ff00',
 			fontFamily: 'Arial',
 			fontStyle: 'bold'
 		});

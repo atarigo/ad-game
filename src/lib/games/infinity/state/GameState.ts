@@ -13,6 +13,8 @@ import {
 	getAttributeUpgradeCost
 } from '../data/constants';
 import type { Tier } from '../data/constants';
+import { ProgressManager } from '../systems/ProgressManager';
+import type { StageCompleteResult } from '../systems/ProgressManager';
 
 /**
  * 地圖等級
@@ -100,7 +102,10 @@ export interface IGameState {
 export class GameState {
 	private static instance: GameState | null = null;
 
-	// 進度
+	// 進度管理器
+	private progressManager: ProgressManager;
+
+	// 進度（從 ProgressManager 同步，保持向後相容）
 	public currentMapLevel: MapLevel = MapLevel.D;
 	public currentStage: number = 1;
 	public totalStagesCleared: number = 0;
@@ -117,6 +122,24 @@ export class GameState {
 
 	private constructor() {
 		this.playerStats = this.createInitialPlayerStats();
+		
+		// 初始化進度管理器
+		this.progressManager = new ProgressManager('D', {
+			onProgressUpdate: (state) => {
+				// 同步進度狀態到 GameState
+				this.currentMapLevel = state.currentMapLevel;
+				this.currentStage = state.currentStage;
+				this.totalStagesCleared = state.totalStagesCleared;
+				this.stagesClearedInCurrentLevel = state.stagesClearedInCurrentLevel;
+			}
+		});
+		
+		// 初始化關卡配置
+		const progressState = this.progressManager.getProgressState();
+		this.currentMapLevel = progressState.currentMapLevel;
+		this.currentStage = progressState.currentStage;
+		this.totalStagesCleared = progressState.totalStagesCleared;
+		this.stagesClearedInCurrentLevel = progressState.stagesClearedInCurrentLevel;
 		this.currentStageConfig = getRandomStage(this.currentMapLevel);
 	}
 
@@ -134,6 +157,9 @@ export class GameState {
 	 * 重置遊戲狀態（開始新遊戲）
 	 */
 	public static reset(): void {
+		if (GameState.instance) {
+			GameState.instance.progressManager.reset('D');
+		}
 		GameState.instance = null;
 	}
 
@@ -177,39 +203,30 @@ export class GameState {
 
 	/**
 	 * 進入下一關
-	 * @returns 是否成功進入下一關（false 表示遊戲通關）
+	 * @returns 關卡完成結果（包含是否晉級、新關卡配置等）
 	 */
-	public nextStage(): boolean {
-		this.totalStagesCleared++;
-		this.stagesClearedInCurrentLevel++;
-		this.currentStage++;
+	public nextStage(): StageCompleteResult {
+		// 使用 ProgressManager 處理進度邏輯
+		const result = this.progressManager.completeStage();
+		
+		// 更新 GameState 的狀態（已透過回調同步，這裡確保關卡配置更新）
+		this.currentStageConfig = result.nextStageConfig;
+		
+		return result;
+	}
 
-		// 檢查是否可以晉級
-		if (this.stagesClearedInCurrentLevel >= STAGES_TO_PROMOTE) {
-			const currentIndex = MAP_LEVEL_ORDER.indexOf(this.currentMapLevel);
-
-			if (currentIndex < MAP_LEVEL_ORDER.length - 1) {
-				// 晉級到下一等級
-				this.currentMapLevel = MAP_LEVEL_ORDER[currentIndex + 1];
-				this.currentStage = 1;
-				this.stagesClearedInCurrentLevel = 0;
-				console.log(`🎉 晉級到 ${this.currentMapLevel} 級！`);
-			}
-			// S 級無限循環，不需要特殊處理
-		}
-
-		// 選擇下一個關卡配置
-		this.currentStageConfig = getRandomStage(this.currentMapLevel);
-
-		return true;
+	/**
+	 * 取得進度管理器（用於需要直接訪問進度管理器的場景）
+	 */
+	public getProgressManager(): ProgressManager {
+		return this.progressManager;
 	}
 
 	/**
 	 * 取得當前關卡的總編號
 	 */
 	public get currentStageNumber(): number {
-		const mapIndex = MAP_LEVEL_ORDER.indexOf(this.currentMapLevel);
-		return mapIndex * STAGES_PER_MAP + this.currentStage;
+		return this.progressManager.getCurrentStageNumber(STAGES_PER_MAP);
 	}
 
 	/**

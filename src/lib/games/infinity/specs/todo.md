@@ -182,8 +182,7 @@
 階段 1：系統抽離
 ├── 1.1 BattleManager（戰鬥管理）
 ├── 1.2 WaveManager（波次管理）
-├── 1.3 DropManager（掉落管理）
-└── 1.4 ProgressManager（進度管理）
+└── 1.3 ProgressManager（進度管理）
 
 階段 2：商店重構
 ├── 2.1 統一物品系統
@@ -274,17 +273,12 @@ type WinCondition =
 - [ ] 勝利條件檢查
 - [ ] 波次切換邏輯
 
-#### 1.3 DropManager
-- [ ] 建立 `systems/DropManager.ts`
-- [ ] 掉落機率計算
-- [ ] 裝備生成邏輯
-- [ ] 掉落物 UI
-
-#### 1.4 ProgressManager
-- [ ] 建立 `systems/ProgressManager.ts`
-- [ ] 關卡完成計數
-- [ ] 晉級判定（3 次通關 → 晉級）
-- [ ] S 級無限循環
+#### 1.3 ProgressManager
+- [x] 建立 `systems/ProgressManager.ts`
+- [x] 關卡完成計數
+- [x] 晉級判定（3 次通關 → 晉級）
+- [x] S 級無限循環
+- [x] 從 GameState 抽離進度相關邏輯
 
 ---
 
@@ -375,7 +369,7 @@ Week 1: 階段 0（資料結構）
 Week 2: 階段 1（系統抽離）
 ├── Day 1-2: BattleManager
 ├── Day 3: WaveManager
-└── Day 4-5: DropManager + ProgressManager
+└── Day 4-5: ProgressManager
 
 Week 3: 階段 2（商店重構）
 ├── Day 1-2: 統一物品系統
@@ -391,6 +385,19 @@ Week 3: 階段 2（商店重構）
 - [ ] 統一錯誤處理
 - [ ] 加入單元測試
 - [ ] 效能優化（大量敵人時）
+
+---
+
+## 次要功能（非核心機制）
+
+### 掉落系統（DropManager）
+- [ ] 建立 `systems/DropManager.ts`
+- [ ] 掉落機率計算（15% 機率）
+- [ ] 裝備生成邏輯（依敵人等級）
+- [ ] 掉落物 UI 顯示
+- [ ] 掉落物拾取機制
+
+> 註：此功能非主要遊戲機制，可延後實作
 
 ---
 
