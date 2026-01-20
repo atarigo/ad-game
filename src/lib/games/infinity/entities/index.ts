@@ -10,3 +10,16 @@ export type {
 	EquipmentBonuses,
 	DerivedAttributes
 } from './CharacterStats';
+
+export {
+	WeaponType,
+	ArmorType,
+	ItemType,
+	WEAPONS,
+	ARMORS,
+	ITEMS,
+	createDefaultWeapon,
+	createDefaultArmor
+} from './Equipment';
+
+export type { Weapon, Armor, Item } from './Equipment';

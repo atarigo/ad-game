@@ -10,7 +10,17 @@ import {
 	HEALTH_BAR,
 	INFO_DRAWER
 } from '../config';
-import { CharacterStats } from '../entities';
+import {
+	CharacterStats,
+	WeaponType,
+	ArmorType,
+	ItemType,
+	WEAPONS,
+	ARMORS,
+	ITEMS,
+	createDefaultWeapon,
+	createDefaultArmor
+} from '../entities';
 
 // 血量條結構
 interface HealthBar {
@@ -25,6 +35,9 @@ interface InfoDrawer {
 	nameText: Phaser.GameObjects.Text;
 	healthText: Phaser.GameObjects.Text;
 	statsTexts: Phaser.GameObjects.Text[];
+	weaponText: Phaser.GameObjects.Text;
+	armorText: Phaser.GameObjects.Text;
+	itemsText: Phaser.GameObjects.Text;
 }
 
 export class MainScene extends Phaser.Scene {
@@ -243,18 +256,36 @@ export class MainScene extends Phaser.Scene {
 	 * 初始化玩家和敵人的角色狀態
 	 */
 	private initializeStats() {
-		// 玩家使用預設屬性，可加上武器加成
+		// 玩家：使用預設屬性，裝備木劍和布甲，初始擁有 1 瓶血瓶
 		this.playerStats = new CharacterStats(
 			{}, // 使用預設主屬性
-			{ weaponAttack: 5 } // 初始武器攻擊力
+			{}, // 不使用舊的裝備加成系統
+			{
+				weapon: createDefaultWeapon(), // 木劍 (+5 攻擊)
+				armor: createDefaultArmor(), // 布甲 (+1 防禦)
+				items: [ITEMS[ItemType.HealthPotion]], // 初始 1 瓶血瓶
+				maxItemSlots: 1 // 初始道具欄位 1 格
+			}
 		);
 
-		// 敵人使用預設屬性
-		this.enemyStats = new CharacterStats();
+		// 敵人：使用預設屬性，裝備木劍和布甲，無道具
+		this.enemyStats = new CharacterStats(
+			{}, // 使用預設主屬性
+			{}, // 不使用舊的裝備加成系統
+			{
+				weapon: createDefaultWeapon(), // 木劍 (+5 攻擊)
+				armor: createDefaultArmor(), // 布甲 (+1 防禦)
+				items: [], // 敵人無道具
+				maxItemSlots: 0 // 敵人無道具欄位
+			}
+		);
 
 		// 輸出狀態到控制台供測試
 		console.log('Player Stats:', {
 			primary: this.playerStats.primary,
+			weapon: this.playerStats.weapon?.name,
+			armor: this.playerStats.armor?.name,
+			items: this.playerStats.items.map((i) => i.name),
 			derived: this.playerStats.derived,
 			currentHealth: this.playerStats.currentHealth,
 			currentMana: this.playerStats.currentMana
@@ -262,6 +293,8 @@ export class MainScene extends Phaser.Scene {
 
 		console.log('Enemy Stats:', {
 			primary: this.enemyStats.primary,
+			weapon: this.enemyStats.weapon?.name,
+			armor: this.enemyStats.armor?.name,
 			derived: this.enemyStats.derived,
 			currentHealth: this.enemyStats.currentHealth,
 			currentMana: this.enemyStats.currentMana
@@ -478,7 +511,7 @@ export class MainScene extends Phaser.Scene {
 			fontFamily: 'Arial'
 		});
 
-		// 六屬性文字（分兩列）
+		// 六屬性文字（分兩列，調整位置）
 		const statsTexts: Phaser.GameObjects.Text[] = [];
 		const attributes = [
 			{ label: '力量', key: 'strength' },
@@ -491,8 +524,8 @@ export class MainScene extends Phaser.Scene {
 
 		const col1X = padding;
 		const col2X = GAME_WIDTH / 2 + padding;
-		const startY = padding + 50;
-		const lineHeight = 22;
+		const startY = padding + 42;
+		const lineHeight = 18;
 
 		attributes.forEach((attr, index) => {
 			const col = index < 3 ? col1X : col2X;
@@ -505,8 +538,37 @@ export class MainScene extends Phaser.Scene {
 			statsTexts.push(text);
 		});
 
+		// 裝備文字
+		const equipmentY = startY + 3 * lineHeight + 8;
+		const weaponText = this.add.text(padding, equipmentY, '武器: 無', {
+			fontSize: `${fontSize}px`,
+			color: INFO_DRAWER.equipmentColor,
+			fontFamily: 'Arial'
+		});
+
+		const armorText = this.add.text(padding, equipmentY + 16, '防具: 無', {
+			fontSize: `${fontSize}px`,
+			color: INFO_DRAWER.equipmentColor,
+			fontFamily: 'Arial'
+		});
+
+		// 道具文字
+		const itemsText = this.add.text(padding, equipmentY + 32, '道具: 無', {
+			fontSize: `${fontSize}px`,
+			color: INFO_DRAWER.equipmentColor,
+			fontFamily: 'Arial'
+		});
+
 		// 將所有元素加入容器
-		container.add([background, nameText, healthText, ...statsTexts]);
+		container.add([
+			background,
+			nameText,
+			healthText,
+			...statsTexts,
+			weaponText,
+			armorText,
+			itemsText
+		]);
 
 		// 設置深度，確保在最上層
 		container.setDepth(100);
@@ -516,7 +578,10 @@ export class MainScene extends Phaser.Scene {
 			background,
 			nameText,
 			healthText,
-			statsTexts
+			statsTexts,
+			weaponText,
+			armorText,
+			itemsText
 		};
 	}
 
@@ -628,6 +693,21 @@ export class MainScene extends Phaser.Scene {
 		attributes.forEach((attr, index) => {
 			this.infoDrawer.statsTexts[index].setText(`${attr.label}: ${attr.value}`);
 		});
+
+		// 更新裝備資訊
+		const weaponName = stats.weapon ? `${stats.weapon.name} (+${stats.weapon.attack})` : '無';
+		this.infoDrawer.weaponText.setText(`武器: ${weaponName}`);
+
+		const armorName = stats.armor ? `${stats.armor.name} (+${stats.armor.defense})` : '無';
+		this.infoDrawer.armorText.setText(`防具: ${armorName}`);
+
+		// 更新道具資訊
+		if (stats.items.length > 0) {
+			const itemNames = stats.items.map((item) => item.name).join(', ');
+			this.infoDrawer.itemsText.setText(`道具: ${itemNames} (${stats.items.length}/${stats.maxItemSlots})`);
+		} else {
+			this.infoDrawer.itemsText.setText(`道具: 無 (0/${stats.maxItemSlots})`);
+		}
 	}
 
 	/**

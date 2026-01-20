@@ -3,6 +3,8 @@
  * 敵我雙方皆使用相同的屬性公式計算
  */
 
+import type { Weapon, Armor, Item } from './Equipment';
+
 // 主屬性基礎值
 export const BASE_ATTRIBUTE_VALUE = 10;
 
@@ -54,7 +56,7 @@ export interface DerivedAttributes {
 	readonly healthPoints: number;
 	/** 魔力 = 智力 * 10 */
 	readonly manaPoints: number;
-	/** 物理防禦 = 體力 */
+	/** 物理防禦 = 體力 + 防具防禦力 */
 	readonly defense: number;
 	/** 魔法防禦力 = 智力 + 防具魔法防禦力 */
 	readonly magicDefense: number;
@@ -97,14 +99,22 @@ export function createEmptyEquipmentBonuses(): EquipmentBonuses {
 
 /**
  * 角色狀態類別
- * 包含主屬性、裝備加成，以及自動計算的延伸屬性
+ * 包含主屬性、裝備、道具，以及自動計算的延伸屬性
  */
 export class CharacterStats {
 	/** 主屬性 */
 	public primary: PrimaryAttributes;
 
-	/** 裝備加成 */
+	/** 裝備加成（保留向後兼容） */
 	public equipment: EquipmentBonuses;
+
+	/** 裝備欄位 */
+	public weapon: Weapon | null = null;
+	public armor: Armor | null = null;
+
+	/** 道具欄位（初始容量 1，最大容量 3） */
+	public items: Item[] = [];
+	public maxItemSlots: number = 1;
 
 	/** 當前血量 */
 	public currentHealth: number;
@@ -114,7 +124,13 @@ export class CharacterStats {
 
 	constructor(
 		primary: Partial<PrimaryAttributes> = {},
-		equipment: Partial<EquipmentBonuses> = {}
+		equipment: Partial<EquipmentBonuses> = {},
+		options?: {
+			weapon?: Weapon | null;
+			armor?: Armor | null;
+			items?: Item[];
+			maxItemSlots?: number;
+		}
 	) {
 		this.primary = {
 			...createDefaultPrimaryAttributes(),
@@ -124,6 +140,12 @@ export class CharacterStats {
 			...createEmptyEquipmentBonuses(),
 			...equipment
 		};
+
+		// 裝備欄位
+		this.weapon = options?.weapon ?? null;
+		this.armor = options?.armor ?? null;
+		this.items = options?.items ?? [];
+		this.maxItemSlots = options?.maxItemSlots ?? 1;
 
 		// 初始化當前血量和魔力為最大值
 		this.currentHealth = this.derived.healthPoints;
@@ -135,8 +157,13 @@ export class CharacterStats {
 	 */
 	get derived(): DerivedAttributes {
 		const { strength, vitality, intelligence, willpower, luck } = this.primary;
-		const { weaponAttack, magicAttack, magicWeaponAttack, ammoAttack, armorMagicDefense } =
-			this.equipment;
+		const { magicAttack, magicWeaponAttack, ammoAttack, armorMagicDefense } = this.equipment;
+
+		// 從裝備欄位取得武器攻擊力（優先使用裝備欄位）
+		const weaponAttack = this.weapon?.attack ?? this.equipment.weaponAttack;
+
+		// 從裝備欄位取得防具防禦力
+		const armorDefense = this.armor?.defense ?? 0;
 
 		return {
 			// 攻擊類
@@ -149,7 +176,7 @@ export class CharacterStats {
 			manaPoints: intelligence * 10,
 
 			// 防禦類
-			defense: vitality,
+			defense: vitality + armorDefense,
 			magicDefense: intelligence + armorMagicDefense,
 
 			// 回復類
@@ -228,5 +255,68 @@ export class CharacterStats {
 	resetToMax(): void {
 		this.currentHealth = this.derived.healthPoints;
 		this.currentMana = this.derived.manaPoints;
+	}
+
+	/**
+	 * 裝備武器
+	 * @param weapon 武器
+	 */
+	equipWeapon(weapon: Weapon): void {
+		this.weapon = weapon;
+	}
+
+	/**
+	 * 裝備防具
+	 * @param armor 防具
+	 */
+	equipArmor(armor: Armor): void {
+		this.armor = armor;
+	}
+
+	/**
+	 * 添加道具到道具欄
+	 * @param item 道具
+	 * @returns 是否成功添加（道具欄是否還有空間）
+	 */
+	addItem(item: Item): boolean {
+		if (this.items.length >= this.maxItemSlots) {
+			return false;
+		}
+		this.items.push(item);
+		return true;
+	}
+
+	/**
+	 * 使用道具
+	 * @param index 道具索引
+	 * @returns 是否成功使用
+	 */
+	useItem(index: number): boolean {
+		if (index < 0 || index >= this.items.length) {
+			return false;
+		}
+		const item = this.items[index];
+		item.effect(this);
+		this.items.splice(index, 1); // 使用後移除
+		return true;
+	}
+
+	/**
+	 * 移除道具（不使用）
+	 * @param index 道具索引
+	 * @returns 被移除的道具，如果索引無效則返回 null
+	 */
+	removeItem(index: number): Item | null {
+		if (index < 0 || index >= this.items.length) {
+			return null;
+		}
+		return this.items.splice(index, 1)[0];
+	}
+
+	/**
+	 * 檢查道具欄是否還有空間
+	 */
+	get hasItemSpace(): boolean {
+		return this.items.length < this.maxItemSlots;
 	}
 }
