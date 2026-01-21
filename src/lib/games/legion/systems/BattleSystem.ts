@@ -3,7 +3,8 @@ import {
 	COMPONENTS,
 	type PositionComponent,
 	type TeamComponent,
-	type CombatComponent
+	type CombatComponent,
+	type RenderComponent
 } from '../ecs/Components';
 import { DEBUG_MODE } from '../config';
 
@@ -244,9 +245,21 @@ export class BattleSystem {
 	// 移除實體
 	private removeEntity(entity: Entity) {
 		// 移除渲染物件
-		const render = entity.getComponent<any>(COMPONENTS.RENDER);
-		if (render && render.sprite) {
-			render.sprite.destroy();
+		const render = entity.getComponent<RenderComponent>(COMPONENTS.RENDER);
+		if (render) {
+			if (render.sprite) {
+				render.sprite.destroy();
+			}
+			// 移除 HP bar 相關物件
+			if (render.hpBarBackground) {
+				render.hpBarBackground.destroy();
+			}
+			if (render.hpBarFill) {
+				render.hpBarFill.destroy();
+			}
+			if (render.hpBarBorder) {
+				render.hpBarBorder.destroy();
+			}
 		}
 
 		// 從世界中移除
