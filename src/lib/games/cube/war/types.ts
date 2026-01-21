@@ -25,9 +25,11 @@ export interface Enemy {
 	maxHp: number;
 }
 
+import type { GamePhase } from './config';
+
 // 遊戲狀態
 export interface GameState {
-	phase: string;
+	phase: GamePhase;
 	playerHp: number;
 	round: number;
 	enemies: Enemy[];

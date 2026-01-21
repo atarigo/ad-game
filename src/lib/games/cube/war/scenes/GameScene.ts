@@ -16,6 +16,7 @@ import type { TetrisPiece, GridPosition, Enemy, GameState } from '../types';
 export class GameScene extends Phaser.Scene {
 	private gameState!: GameState;
 	private enemyGraphics: Phaser.GameObjects.Graphics[] = [];
+	private enemyTexts: Phaser.GameObjects.Text[] = [];
 	private playerCellGraphics: Map<string, Phaser.GameObjects.Graphics> = new Map();
 	private optionPieces: Phaser.GameObjects.Container[] = [];
 	private draggedPiece: Phaser.GameObjects.Container | null = null;
@@ -160,9 +161,11 @@ export class GameScene extends Phaser.Scene {
 	}
 
 	private drawEnemies() {
-		// 清除舊的敵人圖形
+		// 清除舊的敵人圖形和文字
 		this.enemyGraphics.forEach((g) => g.destroy());
 		this.enemyGraphics = [];
+		this.enemyTexts.forEach((t) => t.destroy());
+		this.enemyTexts = [];
 
 		for (const enemy of this.gameState.enemies) {
 			const worldPos = GridSystem.gridToWorld(enemy.position, 'enemy');
@@ -187,11 +190,12 @@ export class GameScene extends Phaser.Scene {
 
 			// 顯示冷卻時間
 			if (enemy.cooldown > 0) {
-				this.add
+				const cooldownText = this.add
 					.text(worldPos.x - size / 2 + 5, worldPos.y - size / 2 + 5, `${enemy.cooldown}`, {
 						fontSize: '12px',
 						color: '#ffffff'
 					});
+				this.enemyTexts.push(cooldownText);
 			}
 
 			this.enemyGraphics.push(graphics);
@@ -273,6 +277,11 @@ export class GameScene extends Phaser.Scene {
 	private setupDragAndDrop() {
 		this.optionPieces.forEach((container) => {
 			this.input.setDraggable(container);
+
+			// 移除舊的事件監聽器以避免重複綁定
+			container.removeAllListeners('dragstart');
+			container.removeAllListeners('drag');
+			container.removeAllListeners('dragend');
 
 			container.on('dragstart', (pointer: Phaser.Input.Pointer) => {
 				if (this.gameState.phase !== GamePhase.PLAYER_TURN) return;
@@ -408,20 +417,26 @@ export class GameScene extends Phaser.Scene {
 		}
 
 		// 移除已使用的選項
-		if (this.draggedPieceIndex >= 0) {
+		if (this.draggedPieceIndex >= 0 && this.draggedPieceIndex < this.gameState.options.length) {
 			this.gameState.options.splice(this.draggedPieceIndex, 1);
-			this.draggedPiece?.destroy();
-			this.optionPieces.splice(this.draggedPieceIndex, 1);
+			if (this.draggedPiece) {
+				this.draggedPiece.destroy();
+			}
+			if (this.draggedPieceIndex < this.optionPieces.length) {
+				this.optionPieces.splice(this.draggedPieceIndex, 1);
+			}
 		}
 
 		// 重新生成選項
 		if (this.gameState.options.length === 0) {
 			this.generateOptions();
 		} else {
-			// 更新索引
+			// 更新索引並重新設置拖曳事件
 			this.optionPieces.forEach((container, index) => {
 				container.setData('pieceIndex', index);
 			});
+			// 重新設置拖曳事件以確保索引正確
+			this.setupDragAndDrop();
 		}
 
 		// 檢查是否還有可放置的方塊
@@ -508,8 +523,23 @@ export class GameScene extends Phaser.Scene {
 	}
 
 	private hasPlaceablePieces(): boolean {
-		// 簡化檢查：如果還有選項就認為可以放置
-		return this.gameState.options.length > 0;
+		// 檢查是否還有可以放置的方塊
+		if (this.gameState.options.length === 0) {
+			return false;
+		}
+
+		// 檢查每個選項是否可以放置在玩家區域的任何位置
+		for (const piece of this.gameState.options) {
+			for (let row = 0; row < GRID_CONFIG.playerRows; row++) {
+				for (let col = 0; col < GRID_CONFIG.playerCols; col++) {
+					if (TetrisSystem.canPlacePiece(piece, { row, col }, this.gameState.playerGrid)) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
 	}
 
 	private endPlayerTurn() {
@@ -521,6 +551,7 @@ export class GameScene extends Phaser.Scene {
 	private processEnemyTurn() {
 		// 減少冷卻時間
 		EnemySystem.reduceCooldowns(this.gameState.enemies);
+		this.drawEnemies(); // 更新冷卻時間顯示
 
 		// 獲取可以攻擊的敵人
 		const readyEnemies = EnemySystem.getReadyEnemies(this.gameState.enemies);
@@ -538,6 +569,12 @@ export class GameScene extends Phaser.Scene {
 				this.gameOver();
 				return;
 			}
+		}
+
+		// 檢查敵人是否全滅
+		if (this.gameState.enemies.length === 0) {
+			this.roundComplete();
+			return;
 		}
 
 		// 回到開始階段
@@ -559,6 +596,9 @@ export class GameScene extends Phaser.Scene {
 		this.roundText.setText(`回合: ${this.gameState.round}`);
 		this.spawnEnemies();
 		this.gameState.phase = GamePhase.START;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+		this.generateOptions();
+		this.gameState.phase = GamePhase.PLAYER_TURN;
 		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
 	}
 
