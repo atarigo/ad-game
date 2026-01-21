@@ -8,6 +8,7 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 	const Phaser = await import('phaser');
 	const { MenuScene } = await import('./scenes/MenuScene');
 	const { GameScene } = await import('./scenes/GameScene');
+	const { ResultScene } = await import('./scenes/ResultScene');
 
 	const config: Phaser.Types.Core.GameConfig = {
 		type: Phaser.AUTO,
@@ -15,7 +16,7 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 		width: GAME_WIDTH,
 		height: GAME_HEIGHT,
 		backgroundColor: COLORS.background,
-		scene: [MenuScene, GameScene],
+		scene: [MenuScene, GameScene, ResultScene],
 		scale: {
 			mode: Phaser.Scale.FIT,
 			autoCenter: Phaser.Scale.CENTER_BOTH
