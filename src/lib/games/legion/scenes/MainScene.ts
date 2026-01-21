@@ -17,16 +17,20 @@ import {
 	type TeamComponent,
 	type StatsComponent,
 	type CombatComponent,
-	type RenderComponent
+	type RenderComponent,
+	type MovementComponent
 } from '../ecs/Components';
 import { GridSystem } from '../systems/GridSystem';
 import { BattleSystem, TurnPhase, BattleResult } from '../systems/BattleSystem';
+import { MovementSystem } from '../systems/MovementSystem';
 
 export class MainScene extends Phaser.Scene {
 	private world!: World;
 	private battleSystem!: BattleSystem;
+	private movementSystem!: MovementSystem;
 	private endTurnButton!: Phaser.GameObjects.Rectangle;
 	private endTurnButtonText!: Phaser.GameObjects.Text;
+	private draggedEntity: any = null;
 
 	constructor() {
 		super({ key: 'MainScene' });
@@ -37,11 +41,13 @@ export class MainScene extends Phaser.Scene {
 
 		this.world = new World();
 		this.battleSystem = new BattleSystem(this.world, (entity) => this.updateHpBar(entity));
+		this.movementSystem = new MovementSystem(this.world);
 
 		this.drawUI();
 		this.spawnAlly();
 		this.spawnEnemies();
 		this.createEndTurnButton();
+		this.setupDragAndDrop();
 
 		if (DEBUG_MODE) console.log('🎮 [Phase] 玩家回合');
 	}
@@ -190,6 +196,13 @@ export class MainScene extends Phaser.Scene {
 		};
 		entity.addComponent(COMPONENTS.COMBAT, combat);
 
+		// 移動組件
+		const movement: MovementComponent = {
+			canMove: true,
+			hasMoved: false
+		};
+		entity.addComponent(COMPONENTS.MOVEMENT, movement);
+
 		// 渲染
 		this.renderCharacter(entity, false);
 	}
@@ -278,6 +291,12 @@ export class MainScene extends Phaser.Scene {
 		sprite.setStrokeStyle(2, 0xffffff);
 		sprite.setDepth(10); // 角色在第 10 層
 
+		// 為我方角色啟用互動
+		if (!isEnemy) {
+			sprite.setInteractive({ draggable: true, useHandCursor: true });
+			(sprite as any).entityId = entity.id; // 儲存 entity ID
+		}
+
 		// HP 條位置（角色中心上方）
 		const hpBarX = cellPos.x + width / 2;
 		const hpBarY = cellPos.y + HP_BAR.offsetY;
@@ -360,6 +379,8 @@ export class MainScene extends Phaser.Scene {
 		// 點擊事件
 		this.endTurnButton.on('pointerdown', () => {
 			if (this.battleSystem.getCurrentPhase() === TurnPhase.PLAYER_CONTROL) {
+				// 重置移動狀態
+				this.movementSystem.resetAllyMovement();
 				this.battleSystem.endPlayerControl();
 			}
 		});
@@ -372,6 +393,130 @@ export class MainScene extends Phaser.Scene {
 		this.endTurnButton.on('pointerout', () => {
 			this.endTurnButton.setFillStyle(0x00aa00);
 		});
+	}
+
+	private setupDragAndDrop() {
+		// 拖曳開始
+		this.input.on('dragstart', (pointer: any, gameObject: any) => {
+			if (this.battleSystem.getCurrentPhase() !== TurnPhase.PLAYER_CONTROL) {
+				return;
+			}
+
+			const entity = this.world.getEntity(gameObject.entityId);
+			if (!entity) return;
+
+			const movement = entity.getComponent<MovementComponent>(COMPONENTS.MOVEMENT);
+			if (!movement || movement.hasMoved) {
+				if (DEBUG_MODE) console.log('⚠️ 該角色本回合已移動');
+				return;
+			}
+
+			this.draggedEntity = entity;
+			gameObject.setAlpha(0.7);
+
+			if (DEBUG_MODE) {
+				const pos = entity.getComponent<PositionComponent>(COMPONENTS.POSITION);
+				console.log(`🤏 開始拖曳角色 (${pos?.row},${pos?.col})`);
+			}
+		});
+
+		// 拖曳中
+		this.input.on('drag', (pointer: any, gameObject: any, dragX: number, dragY: number) => {
+			if (!this.draggedEntity) return;
+
+			gameObject.x = dragX;
+			gameObject.y = dragY;
+
+			// 同步更新 HP 條位置
+			const render = this.draggedEntity.getComponent<RenderComponent>(COMPONENTS.RENDER);
+			if (render) {
+				const width = gameObject.width;
+				const hpBarX = dragX + width / 2;
+				const hpBarY = dragY + HP_BAR.offsetY;
+
+				if (render.hpBarBackground) {
+					render.hpBarBackground.x = hpBarX;
+					render.hpBarBackground.y = hpBarY;
+				}
+				if (render.hpBarFill) {
+					render.hpBarFill.x = hpBarX - HP_BAR.width / 2;
+					render.hpBarFill.y = hpBarY;
+				}
+				if (render.hpBarBorder) {
+					render.hpBarBorder.x = hpBarX;
+					render.hpBarBorder.y = hpBarY;
+				}
+			}
+		});
+
+		// 拖曳結束
+		this.input.on('dragend', (pointer: any, gameObject: any) => {
+			if (!this.draggedEntity) return;
+
+			gameObject.setAlpha(1);
+
+			const gridPos = this.movementSystem.pixelToAllyGrid(pointer.x, pointer.y);
+
+			if (gridPos) {
+				const success = this.movementSystem.moveAlly(
+					this.draggedEntity,
+					gridPos.row,
+					gridPos.col
+				);
+
+				if (success) {
+					if (DEBUG_MODE) {
+						console.log(`✅ 移動成功 → (${gridPos.row},${gridPos.col})`);
+					}
+					// 更新渲染位置
+					this.updateCharacterPosition(this.draggedEntity);
+				} else {
+					if (DEBUG_MODE) {
+						console.log('❌ 無法移動到該位置');
+					}
+					// 移回原位
+					this.updateCharacterPosition(this.draggedEntity);
+				}
+			} else {
+				// 拖曳到棋盤外，移回原位
+				this.updateCharacterPosition(this.draggedEntity);
+			}
+
+			this.draggedEntity = null;
+		});
+	}
+
+	private updateCharacterPosition(entity: any) {
+		const position = entity.getComponent<PositionComponent>(COMPONENTS.POSITION);
+		const render = entity.getComponent<RenderComponent>(COMPONENTS.RENDER);
+
+		if (!position || !render || !render.sprite) return;
+
+		const cellPos = GridSystem.getAllyCellPosition(position.row, position.col);
+		const cellSize = GRID.ally.cellSize;
+		const gap = GRID.ally.gap;
+		const width = position.width * cellSize + (position.width - 1) * gap;
+
+		// 更新角色位置
+		render.sprite.x = cellPos.x;
+		render.sprite.y = cellPos.y;
+
+		// 更新 HP 條位置
+		const hpBarX = cellPos.x + width / 2;
+		const hpBarY = cellPos.y + HP_BAR.offsetY;
+
+		if (render.hpBarBackground) {
+			render.hpBarBackground.x = hpBarX;
+			render.hpBarBackground.y = hpBarY;
+		}
+		if (render.hpBarFill) {
+			render.hpBarFill.x = hpBarX - HP_BAR.width / 2;
+			render.hpBarFill.y = hpBarY;
+		}
+		if (render.hpBarBorder) {
+			render.hpBarBorder.x = hpBarX;
+			render.hpBarBorder.y = hpBarY;
+		}
 	}
 
 }

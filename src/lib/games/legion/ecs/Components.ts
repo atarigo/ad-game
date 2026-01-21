@@ -34,11 +34,18 @@ export interface RenderComponent {
 	hpBarBorder?: Phaser.GameObjects.Rectangle;
 }
 
+// 移動組件
+export interface MovementComponent {
+	canMove: boolean; // 是否可以移動
+	hasMoved: boolean; // 本回合是否已移動
+}
+
 // 組件名稱常量
 export const COMPONENTS = {
 	POSITION: 'position',
 	TEAM: 'team',
 	STATS: 'stats',
 	COMBAT: 'combat',
-	RENDER: 'render'
+	RENDER: 'render',
+	MOVEMENT: 'movement'
 } as const;
