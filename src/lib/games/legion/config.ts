@@ -2,6 +2,9 @@
 export const GAME_WIDTH = 360;
 export const GAME_HEIGHT = 640;
 
+// Debug 模式（部署時設為 false）
+export const DEBUG_MODE = true;
+
 // 顏色設定
 export const COLORS = {
 	background: '#000000',

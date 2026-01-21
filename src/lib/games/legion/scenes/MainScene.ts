@@ -1,5 +1,14 @@
 import type Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS, GRID, UI, ENEMY_SIZES, calculateStats } from '../config';
+import {
+	GAME_WIDTH,
+	GAME_HEIGHT,
+	COLORS,
+	GRID,
+	UI,
+	ENEMY_SIZES,
+	calculateStats,
+	DEBUG_MODE
+} from '../config';
 import { World } from '../ecs/Entity';
 import {
 	COMPONENTS,
@@ -10,9 +19,13 @@ import {
 	type RenderComponent
 } from '../ecs/Components';
 import { GridSystem } from '../systems/GridSystem';
+import { BattleSystem, TurnPhase, BattleResult } from '../systems/BattleSystem';
 
 export class MainScene extends Phaser.Scene {
 	private world!: World;
+	private battleSystem!: BattleSystem;
+	private endTurnButton!: Phaser.GameObjects.Rectangle;
+	private endTurnButtonText!: Phaser.GameObjects.Text;
 
 	constructor() {
 		super({ key: 'MainScene' });
@@ -20,10 +33,14 @@ export class MainScene extends Phaser.Scene {
 
 	create() {
 		this.world = new World();
+		this.battleSystem = new BattleSystem(this.world);
 
 		this.drawUI();
 		this.spawnAlly();
 		this.spawnEnemies();
+		this.createEndTurnButton();
+
+		if (DEBUG_MODE) console.log('🎮 [Phase] 玩家回合');
 	}
 
 	private drawUI() {
@@ -261,4 +278,42 @@ export class MainScene extends Phaser.Scene {
 		};
 		entity.addComponent(COMPONENTS.RENDER, render);
 	}
+
+	private createEndTurnButton() {
+		const buttonWidth = 100;
+		const buttonHeight = 40;
+		const buttonX = GAME_WIDTH - buttonWidth - 10;
+		const buttonY = UI.offsetY + UI.height / 2 - buttonHeight / 2;
+
+		// 按鈕背景
+		this.endTurnButton = this.add.rectangle(buttonX, buttonY, buttonWidth, buttonHeight, 0x00aa00);
+		this.endTurnButton.setOrigin(0, 0);
+		this.endTurnButton.setStrokeStyle(2, 0x00ff00);
+		this.endTurnButton.setInteractive({ useHandCursor: true });
+
+		// 按鈕文字
+		this.endTurnButtonText = this.add
+			.text(buttonX + buttonWidth / 2, buttonY + buttonHeight / 2, '結束回合', {
+				fontSize: '14px',
+				color: '#ffffff'
+			})
+			.setOrigin(0.5, 0.5);
+
+		// 點擊事件
+		this.endTurnButton.on('pointerdown', () => {
+			if (this.battleSystem.getCurrentPhase() === TurnPhase.PLAYER_CONTROL) {
+				this.battleSystem.endPlayerControl();
+			}
+		});
+
+		// Hover 效果
+		this.endTurnButton.on('pointerover', () => {
+			this.endTurnButton.setFillStyle(0x00ff00);
+		});
+
+		this.endTurnButton.on('pointerout', () => {
+			this.endTurnButton.setFillStyle(0x00aa00);
+		});
+	}
+
 }
