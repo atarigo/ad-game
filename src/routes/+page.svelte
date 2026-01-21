@@ -11,6 +11,9 @@
 			<li>
 				<a href="/playground/mobile">Playground mobile</a>
 			</li>
+			<li>
+				<a href="/cube/war">Cube War</a>
+			</li>
 		</ul>
 	</div>
 </section>
