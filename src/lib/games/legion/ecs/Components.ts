@@ -29,6 +29,9 @@ export interface CombatComponent {
 export interface RenderComponent {
 	color: number;
 	sprite?: Phaser.GameObjects.Rectangle;
+	hpBarBackground?: Phaser.GameObjects.Rectangle;
+	hpBarFill?: Phaser.GameObjects.Rectangle;
+	hpBarBorder?: Phaser.GameObjects.Rectangle;
 }
 
 // 組件名稱常量

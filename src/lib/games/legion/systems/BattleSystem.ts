@@ -26,9 +26,11 @@ export class BattleSystem {
 	private world: World;
 	private currentPhase: TurnPhase = TurnPhase.PLAYER_CONTROL;
 	private battleResult: BattleResult = BattleResult.ONGOING;
+	private onEntityDamaged?: (entity: Entity) => void;
 
-	constructor(world: World) {
+	constructor(world: World, onEntityDamaged?: (entity: Entity) => void) {
 		this.world = world;
+		this.onEntityDamaged = onEntityDamaged;
 	}
 
 	getCurrentPhase(): TurnPhase {
@@ -153,6 +155,11 @@ export class BattleSystem {
 			console.log(
 				`  ⚡ ${attackerInfo} → ${targetInfo} | 傷害: ${damage} | 剩餘HP: ${Math.max(0, targetCombat.currentHp)}/${targetCombat.maxHp}`
 			);
+		}
+
+		// 通知 HP 更新
+		if (this.onEntityDamaged) {
+			this.onEntityDamaged(target);
 		}
 
 		if (targetCombat.currentHp <= 0) {

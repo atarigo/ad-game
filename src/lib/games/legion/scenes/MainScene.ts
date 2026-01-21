@@ -6,6 +6,7 @@ import {
 	GRID,
 	UI,
 	ENEMY_SIZES,
+	HP_BAR,
 	calculateStats,
 	DEBUG_MODE
 } from '../config';
@@ -32,8 +33,10 @@ export class MainScene extends Phaser.Scene {
 	}
 
 	create() {
+		if (DEBUG_MODE) console.log('=== 遊戲開始 ===');
+
 		this.world = new World();
-		this.battleSystem = new BattleSystem(this.world);
+		this.battleSystem = new BattleSystem(this.world, (entity) => this.updateHpBar(entity));
 
 		this.drawUI();
 		this.spawnAlly();
@@ -254,7 +257,8 @@ export class MainScene extends Phaser.Scene {
 
 	private renderCharacter(entity: any, isEnemy: boolean) {
 		const position = entity.getComponent<PositionComponent>(COMPONENTS.POSITION);
-		if (!position) return;
+		const combat = entity.getComponent<CombatComponent>(COMPONENTS.COMBAT);
+		if (!position || !combat) return;
 
 		const cellPos = isEnemy
 			? GridSystem.getEnemyCellPosition(position.row, position.col)
@@ -268,15 +272,69 @@ export class MainScene extends Phaser.Scene {
 
 		const color = isEnemy ? COLORS.enemy : COLORS.ally;
 
+		// 角色方塊
 		const sprite = this.add.rectangle(cellPos.x, cellPos.y, width, height, color);
 		sprite.setOrigin(0, 0);
 		sprite.setStrokeStyle(2, 0xffffff);
+		sprite.setDepth(10); // 角色在第 10 層
+
+		// HP 條位置（角色中心上方）
+		const hpBarX = cellPos.x + width / 2;
+		const hpBarY = cellPos.y + HP_BAR.offsetY;
+
+		// HP 條背景
+		const hpBarBackground = this.add.rectangle(
+			hpBarX,
+			hpBarY,
+			HP_BAR.width,
+			HP_BAR.height,
+			COLORS.hpBarBackground
+		);
+		hpBarBackground.setOrigin(0.5, 0.5);
+		hpBarBackground.setDepth(100); // HP 條在最上層
+
+		// HP 條填充
+		const hpPercent = combat.currentHp / combat.maxHp;
+		const hpBarColor = hpPercent <= HP_BAR.lowHealthThreshold ? COLORS.hpBarLow : COLORS.hpBarFull;
+		const hpBarFill = this.add.rectangle(
+			hpBarX - HP_BAR.width / 2,
+			hpBarY,
+			HP_BAR.width * hpPercent,
+			HP_BAR.height,
+			hpBarColor
+		);
+		hpBarFill.setOrigin(0, 0.5);
+		hpBarFill.setDepth(101); // HP 條填充在背景上方
+
+		// HP 條邊框
+		const hpBarBorder = this.add.rectangle(hpBarX, hpBarY, HP_BAR.width, HP_BAR.height);
+		hpBarBorder.setOrigin(0.5, 0.5);
+		hpBarBorder.setStrokeStyle(HP_BAR.borderWidth, COLORS.hpBarBorder);
+		hpBarBorder.setFillStyle(0x000000, 0); // 透明填充
+		hpBarBorder.setDepth(102); // HP 條邊框在最上方
 
 		const render: RenderComponent = {
 			color,
-			sprite
+			sprite,
+			hpBarBackground,
+			hpBarFill,
+			hpBarBorder
 		};
 		entity.addComponent(COMPONENTS.RENDER, render);
+	}
+
+	updateHpBar(entity: any) {
+		const combat = entity.getComponent<CombatComponent>(COMPONENTS.COMBAT);
+		const render = entity.getComponent<RenderComponent>(COMPONENTS.RENDER);
+
+		if (!combat || !render || !render.hpBarFill) return;
+
+		const hpPercent = Math.max(0, combat.currentHp / combat.maxHp);
+		const hpBarColor = hpPercent <= HP_BAR.lowHealthThreshold ? COLORS.hpBarLow : COLORS.hpBarFull;
+
+		// 更新 HP 條寬度和顏色
+		render.hpBarFill.width = HP_BAR.width * hpPercent;
+		render.hpBarFill.setFillStyle(hpBarColor);
 	}
 
 	private createEndTurnButton() {

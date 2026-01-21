@@ -17,7 +17,20 @@ export const COLORS = {
 	enemy: 0xff0000,
 	ally: 0x00ff00,
 	itemSlot: 0x444444,
-	skillSlot: 0x555555
+	skillSlot: 0x555555,
+	hpBarBackground: 0x333333,
+	hpBarFull: 0x00ff00,
+	hpBarLow: 0xff0000,
+	hpBarBorder: 0x000000
+} as const;
+
+// HP 條設定
+export const HP_BAR = {
+	width: 40,
+	height: 4,
+	offsetY: -8, // 距離角色頂部的距離
+	borderWidth: 1,
+	lowHealthThreshold: 0.3 // 低血量閾值（30%）
 } as const;
 
 // 棋盤設定
