@@ -47,7 +47,8 @@ import type { GamePhase } from './config';
 export interface GameState {
 	phase: GamePhase;
 	playerHp: number;
-	round: number;
+	level: number; // 關卡數
+	round: number; // 回合數（在當前關卡內）
 	enemies: Enemy[];
 	playerGrid: (number | null)[][]; // null 表示空，數字表示方塊ID
 	options: TetrisPiece[];

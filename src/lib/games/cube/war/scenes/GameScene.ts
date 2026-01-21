@@ -22,10 +22,16 @@ export class GameScene extends Phaser.Scene {
 	private draggedPiece: Phaser.GameObjects.Container | null = null;
 	private draggedPieceIndex: number = -1;
 	private playerHpText!: Phaser.GameObjects.Text;
+	private levelText!: Phaser.GameObjects.Text;
 	private roundText!: Phaser.GameObjects.Text;
 	private phaseText!: Phaser.GameObjects.Text;
 	private nextPieceId: number = 1;
 	private previewGraphics: Phaser.GameObjects.Graphics | null = null;
+	private skipButton: Phaser.GameObjects.Container | null = null;
+	private optionOriginalPositions: Map<number, { x: number; y: number }> = new Map();
+	private previewGridPos: GridPosition | null = null;
+	private bullets: Phaser.GameObjects.Graphics[] = [];
+	private bulletData: Array<{ graphics: Phaser.GameObjects.Graphics; startX: number; startY: number; targetY: number; speed: number; fromCell: GridPosition }> = [];
 
 	constructor() {
 		super({ key: 'GameScene' });
@@ -41,24 +47,77 @@ export class GameScene extends Phaser.Scene {
 		// 繪製格子
 		this.drawGrids();
 
-		// 生成初始敵人
-		this.spawnEnemies();
-
-		// 生成初始選項
-		this.generateOptions();
-
-		// 設置拖曳事件
-		this.setupDragAndDrop();
-
-		// 開始遊戲循環
+		// 開始遊戲循環（會自動生成敵人和選項）
 		this.startGameLoop();
+	}
+
+	update() {
+		// 更新子彈位置和碰撞檢測
+		this.updateBullets();
+	}
+
+	private updateBullets() {
+		const deltaTime = this.game.loop.delta / 1000; // 轉換為秒
+		
+		for (let i = this.bulletData.length - 1; i >= 0; i--) {
+			const bulletInfo = this.bulletData[i];
+			const bullet = bulletInfo.graphics;
+			
+			// 移動子彈向上
+			bullet.y -= bulletInfo.speed * deltaTime;
+			
+			// 檢查是否到達畫面上方
+			if (bullet.y <= AREA_POSITIONS.enemyArea.y - 20) {
+				// 子彈到達目標，移除
+				this.removeBullet(i);
+				continue;
+			}
+			
+			// 檢查是否碰撞到敵方方塊
+			const hitEnemy = this.checkBulletEnemyCollision(bullet);
+			if (hitEnemy) {
+				// 子彈碰撞到敵人，造成傷害並移除
+				// 使用子彈來源位置來計算攻擊位置
+				this.attackEnemyAtPosition(bulletInfo.fromCell);
+				this.removeBullet(i);
+				this.drawEnemies();
+				
+				// 檢查敵人是否全滅（關卡完成）
+				if (this.gameState.enemies.length === 0) {
+					this.levelComplete();
+				}
+				continue;
+			}
+		}
+	}
+
+	private checkBulletEnemyCollision(bullet: Phaser.GameObjects.Graphics): Enemy | null {
+		// 將子彈位置轉換為敵人區域的格子座標
+		const gridPos = GridSystem.worldToGrid(bullet.x, bullet.y, 'enemy');
+		if (!gridPos) {
+			return null;
+		}
+		
+		// 檢查該位置是否有敵人（會檢查敵人佔據的所有格子）
+		const enemy = EnemySystem.getEnemyAtPosition(gridPos, this.gameState.enemies);
+		return enemy;
+	}
+
+	private removeBullet(index: number) {
+		if (index >= 0 && index < this.bulletData.length) {
+			const bulletInfo = this.bulletData[index];
+			bulletInfo.graphics.destroy();
+			this.bulletData.splice(index, 1);
+			this.bullets.splice(index, 1);
+		}
 	}
 
 	private initGameState() {
 		this.gameState = {
 			phase: GamePhase.START,
 			playerHp: PLAYER_HP,
-			round: 1,
+			level: 1, // 從關卡1開始
+			round: 1, // 從回合1開始
 			enemies: [],
 			playerGrid: Array(GRID_CONFIG.playerRows)
 				.fill(null)
@@ -75,16 +134,23 @@ export class GameScene extends Phaser.Scene {
 				color: COLORS.text
 			});
 
+		// 關卡數
+		this.levelText = this.add
+			.text(10, 40, `關卡: ${this.gameState.level}`, {
+				fontSize: '16px',
+				color: COLORS.text
+			});
+
 		// 回合數
 		this.roundText = this.add
-			.text(10, 40, `回合: ${this.gameState.round}`, {
+			.text(10, 60, `回合: ${this.gameState.round}`, {
 				fontSize: '16px',
 				color: COLORS.text
 			});
 
 		// 階段
 		this.phaseText = this.add
-			.text(10, 60, `階段: ${this.getPhaseText()}`, {
+			.text(10, 80, `階段: ${this.getPhaseText()}`, {
 				fontSize: '16px',
 				color: COLORS.text
 			});
@@ -156,7 +222,8 @@ export class GameScene extends Phaser.Scene {
 	}
 
 	private spawnEnemies() {
-		this.gameState.enemies = EnemySystem.generateEnemies(this.gameState.round);
+		// 根據關卡數生成敵人（關卡越高，敵人越強）
+		this.gameState.enemies = EnemySystem.generateEnemies(this.gameState.level);
 		this.drawEnemies();
 	}
 
@@ -296,11 +363,19 @@ export class GameScene extends Phaser.Scene {
 			);
 
 			container.setData('pieceIndex', index);
+			// 保存原始位置
+			this.optionOriginalPositions.set(index, {
+				x: areaX + optionWidth / 2,
+				y: optionY
+			});
 			this.optionPieces.push(container);
 		});
 
 		// 重新設置拖曳事件
 		this.setupDragAndDrop();
+		
+		// 更新可放置性檢查和視覺效果
+		this.updatePiecePlaceability();
 	}
 
 	private setupDragAndDrop() {
@@ -317,6 +392,15 @@ export class GameScene extends Phaser.Scene {
 
 				this.draggedPiece = container;
 				this.draggedPieceIndex = container.getData('pieceIndex');
+				this.previewGridPos = null; // 重置預覽位置
+				
+				// 保存當前位置作為原始位置（如果還沒保存）
+				if (!this.optionOriginalPositions.has(this.draggedPieceIndex)) {
+					this.optionOriginalPositions.set(this.draggedPieceIndex, {
+						x: container.x,
+						y: container.y
+					});
+				}
 				
 				// 放大方塊到與中間區域一樣大
 				const targetScale = 1 / GRID_CONFIG.optionPieceScale;
@@ -355,6 +439,13 @@ export class GameScene extends Phaser.Scene {
 					const piece = this.gameState.options[this.draggedPieceIndex];
 					const canPlace = TetrisSystem.canPlacePiece(piece, gridPos, this.gameState.playerGrid);
 					
+					// 如果可以放置，保存這個位置作為預覽位置
+					if (canPlace) {
+						this.previewGridPos = gridPos;
+					} else {
+						this.previewGridPos = null;
+					}
+					
 					// 繪製預覽
 					this.previewGraphics = this.add.graphics();
 					const previewColor = canPlace ? 0x00ff00 : 0xff0000;
@@ -384,6 +475,9 @@ export class GameScene extends Phaser.Scene {
 							);
 						}
 					});
+				} else {
+					// 如果不在有效區域，清除預覽位置
+					this.previewGridPos = null;
 				}
 			});
 
@@ -398,40 +492,37 @@ export class GameScene extends Phaser.Scene {
 					this.previewGraphics = null;
 				}
 
-				const gridPos = GridSystem.worldToGrid(pointer.x, pointer.y, 'player');
-				if (gridPos && this.draggedPieceIndex >= 0) {
+				// 使用預覽時保存的位置（淺綠色標示的位置）
+				if (this.previewGridPos && this.draggedPieceIndex >= 0) {
 					const piece = this.gameState.options[this.draggedPieceIndex];
-					if (TetrisSystem.canPlacePiece(piece, gridPos, this.gameState.playerGrid)) {
-						this.placePiece(piece, gridPos);
+					// 再次確認可以放置（以防狀態改變）
+					if (TetrisSystem.canPlacePiece(piece, this.previewGridPos, this.gameState.playerGrid)) {
+						this.placePiece(piece, this.previewGridPos);
 					} else {
-						// 放回原位，恢復原始大小
-						container.setScale(1);
-						container.setAlpha(1);
-						const optionSpacing = 8;
-						const totalSpacing = optionSpacing * 2;
-						const optionWidth = (GAME_WIDTH - AREA_POSITIONS.optionArea.x * 2 - totalSpacing) / 3;
-						const optionStartX = AREA_POSITIONS.optionArea.x;
-						const optionY = AREA_POSITIONS.optionArea.y + GRID_CONFIG.optionAreaHeight / 2;
-						container.x = optionStartX + this.draggedPieceIndex * (optionWidth + optionSpacing) + optionWidth / 2;
-						container.y = optionY;
+						// 放回原始位置，恢復原始大小
+						this.resetPiecePosition(container, this.draggedPieceIndex);
 					}
 				} else {
-					// 如果不在有效區域，恢復原始大小和位置
-					container.setScale(1);
-					container.setAlpha(1);
-					const optionSpacing = 8;
-					const totalSpacing = optionSpacing * 2;
-					const optionWidth = (GAME_WIDTH - AREA_POSITIONS.optionArea.x * 2 - totalSpacing) / 3;
-					const optionStartX = AREA_POSITIONS.optionArea.x;
-					const optionY = AREA_POSITIONS.optionArea.y + GRID_CONFIG.optionAreaHeight / 2;
-					container.x = optionStartX + this.draggedPieceIndex * (optionWidth + optionSpacing) + optionWidth / 2;
-					container.y = optionY;
+					// 如果沒有有效的預覽位置，恢復原始位置和大小
+					this.resetPiecePosition(container, this.draggedPieceIndex);
 				}
 
+				// 清除預覽位置
+				this.previewGridPos = null;
 				this.draggedPiece = null;
 				this.draggedPieceIndex = -1;
 			});
 		});
+	}
+
+	private resetPiecePosition(container: Phaser.GameObjects.Container, index: number) {
+		container.setScale(1);
+		container.setAlpha(1);
+		const originalPos = this.optionOriginalPositions.get(index);
+		if (originalPos) {
+			container.x = originalPos.x;
+			container.y = originalPos.y;
+		}
 	}
 
 	private placePiece(piece: TetrisPiece, position: GridPosition) {
@@ -454,11 +545,14 @@ export class GameScene extends Phaser.Scene {
 			if (this.draggedPieceIndex < this.optionPieces.length) {
 				this.optionPieces.splice(this.draggedPieceIndex, 1);
 			}
+			// 清除原始位置記錄
+			this.optionOriginalPositions.delete(this.draggedPieceIndex);
 		}
 
-		// 重新生成選項
+		// 檢查是否所有可選方塊都已放置
 		if (this.gameState.options.length === 0) {
-			this.generateOptions();
+			// 根據規格：若所有可選方塊都已放置，在消除方塊（攻擊敵方）完成後，直接進入敵方階段
+			this.endPlayerTurn();
 		} else {
 			// 更新索引並重新設置拖曳事件
 			this.optionPieces.forEach((container, index) => {
@@ -466,38 +560,87 @@ export class GameScene extends Phaser.Scene {
 			});
 			// 重新設置拖曳事件以確保索引正確
 			this.setupDragAndDrop();
-		}
-
-		// 檢查是否還有可放置的方塊
-		if (!this.hasPlaceablePieces()) {
-			this.endPlayerTurn();
+			// 更新可放置性檢查
+			this.updatePiecePlaceability();
 		}
 	}
 
 	private handleLineClear(clearedRows: number[], clearedCols: number[]) {
-		// 重新繪製玩家格子
-		this.drawPlayerGrid();
-
-		// 攻擊敵人
+		// 收集所有需要發射子彈的位置
+		const cellsToShoot: GridPosition[] = [];
+		
+		// 收集行的方塊位置
 		for (const row of clearedRows) {
 			for (let col = 0; col < GRID_CONFIG.playerCols; col++) {
-				this.attackEnemyAtPosition({ row, col });
+				cellsToShoot.push({ row, col });
 			}
 		}
 
+		// 收集列的方塊位置
 		for (const col of clearedCols) {
 			for (let row = 0; row < GRID_CONFIG.playerRows; row++) {
-				this.attackEnemyAtPosition({ row, col });
+				// 避免重複（如果行和列都消除）
+				const exists = cellsToShoot.some(cell => cell.row === row && cell.col === col);
+				if (!exists) {
+					cellsToShoot.push({ row, col });
+				}
 			}
 		}
 
-		// 檢查敵人是否全滅
-		if (this.gameState.enemies.length === 0) {
-			this.roundComplete();
-		}
+		// 依序發射子彈
+		this.shootBulletsSequentially(cellsToShoot);
 	}
 
-	private attackEnemyAtPosition(position: GridPosition) {
+	private async shootBulletsSequentially(cells: GridPosition[]) {
+		// 先清除格子（視覺上）
+		for (const cell of cells) {
+			this.gameState.playerGrid[cell.row][cell.col] = null;
+		}
+		this.drawPlayerGrid();
+
+		// 依序發射子彈
+		for (const cell of cells) {
+			await this.shootBullet(cell);
+			// 小延遲，讓子彈有間隔
+			await new Promise(resolve => setTimeout(resolve, 50));
+		}
+
+		// 注意：實際傷害和關卡完成檢查在子彈碰撞時處理（updateBullets 方法中）
+	}
+
+	private shootBullet(fromCell: GridPosition): Promise<void> {
+		return new Promise((resolve) => {
+			// 計算起始位置（玩家區域的格子中心）
+			const startPos = GridSystem.gridToWorld(fromCell, 'player');
+			
+			// 計算目標位置（畫面上方）
+			const targetY = AREA_POSITIONS.enemyArea.y - 20;
+			
+			// 創建子彈圖形
+			const bullet = this.add.graphics();
+			bullet.fillStyle(0x00ff00, 1);
+			bullet.fillCircle(0, 0, 5);
+			bullet.x = startPos.x;
+			bullet.y = startPos.y;
+			bullet.setDepth(50);
+			
+			// 保存子彈數據（使用手動更新而不是 tween）
+			const bulletInfo = {
+				graphics: bullet,
+				startX: startPos.x,
+				startY: startPos.y,
+				targetY: targetY,
+				speed: 300, // 像素/秒
+				fromCell: fromCell
+			};
+			this.bulletData.push(bulletInfo);
+			this.bullets.push(bullet);
+			
+			resolve();
+		});
+	}
+
+	private attackEnemyAtPosition(position: GridPosition): void {
 		// 轉換到敵人區域的對應位置
 		const enemyCol = position.col;
 		const enemyRow = Math.floor(
@@ -522,8 +665,6 @@ export class GameScene extends Phaser.Scene {
 				}
 			}
 		}
-
-		this.drawEnemies();
 	}
 
 	private drawPlayerGrid() {
@@ -571,50 +712,153 @@ export class GameScene extends Phaser.Scene {
 		return false;
 	}
 
+	private updatePiecePlaceability() {
+		// 檢查每個方塊是否可以放置
+		const placeableStatus: boolean[] = [];
+		
+		for (let i = 0; i < this.gameState.options.length; i++) {
+			const piece = this.gameState.options[i];
+			let canPlace = false;
+			
+			// 檢查是否可以放置在玩家區域的任何位置
+			for (let row = 0; row < GRID_CONFIG.playerRows; row++) {
+				for (let col = 0; col < GRID_CONFIG.playerCols; col++) {
+					if (TetrisSystem.canPlacePiece(piece, { row, col }, this.gameState.playerGrid)) {
+						canPlace = true;
+						break;
+					}
+				}
+				if (canPlace) break;
+			}
+			
+			placeableStatus.push(canPlace);
+			
+			// 更新視覺效果（灰色表示無法放置）
+			if (i < this.optionPieces.length) {
+				const container = this.optionPieces[i];
+				// 使用 alpha 來表示無法放置（降低透明度）
+				container.setAlpha(canPlace ? 1 : 0.3);
+				
+				// 對 Container 內部的 Graphics 對象，通過修改顏色來實現灰色效果
+				// 由於 Graphics 不支持 tint，我們使用 alpha 就足夠了
+			}
+		}
+		
+		// 檢查是否所有方塊都無法放置
+		const allUnplaceable = placeableStatus.length > 0 && placeableStatus.every(status => !status);
+		
+		// 顯示或隱藏跳過按鈕
+		if (allUnplaceable && this.gameState.phase === GamePhase.PLAYER_TURN) {
+			this.showSkipButton();
+		} else {
+			this.hideSkipButton();
+		}
+	}
+
+	private showSkipButton() {
+		if (this.skipButton) {
+			return; // 已經顯示
+		}
+		
+		const buttonX = GAME_WIDTH / 2;
+		const buttonY = GAME_HEIGHT - 30;
+		
+		const buttonBg = this.add.rectangle(buttonX, buttonY, 150, 40, COLORS.button, 0.9);
+		const buttonText = this.add.text(buttonX, buttonY, '跳過階段', {
+			fontSize: '18px',
+			color: '#ffffff'
+		}).setOrigin(0.5);
+		
+		buttonBg.setInteractive({ useHandCursor: true });
+		buttonBg.on('pointerdown', () => {
+			this.endPlayerTurn();
+		});
+		
+		this.skipButton = this.add.container(0, 0);
+		this.skipButton.add([buttonBg, buttonText]);
+		this.skipButton.setDepth(100);
+	}
+
+	private hideSkipButton() {
+		if (this.skipButton) {
+			this.skipButton.destroy();
+			this.skipButton = null;
+		}
+	}
+
 	private endPlayerTurn() {
 		this.gameState.phase = GamePhase.ENEMY_TURN;
 		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
 		this.processEnemyTurn();
 	}
 
-	private processEnemyTurn() {
-		// 減少冷卻時間
-		EnemySystem.reduceCooldowns(this.gameState.enemies);
-		this.drawEnemies(); // 更新冷卻時間顯示
-
-		// 獲取可以攻擊的敵人（冷卻時間為 0）
-		const readyEnemies = EnemySystem.getReadyEnemies(this.gameState.enemies);
-
-		if (readyEnemies.length > 0) {
-			// 敵人攻擊
-			for (const enemy of readyEnemies) {
+	private async processEnemyTurn() {
+		// 依序走訪每個敵方方塊
+		for (const enemy of this.gameState.enemies) {
+			// 減少方塊的行動冷卻時間 -1
+			if (enemy.cooldown > 0) {
+				enemy.cooldown--;
+			}
+			
+			// 更新顯示
+			this.drawEnemies();
+			
+			// 若方塊冷卻結束，則上下位移動一下，對我方生命進行攻擊，再重置冷卻時間
+			if (enemy.cooldown === 0) {
+				// 播放攻擊動畫（方塊上下動一下）
+				await this.playEnemyAttackAnimation(enemy);
+				
+				// 執行攻擊
 				this.enemyAttack(enemy);
+				
 				// 重置冷卻時間
 				enemy.cooldown = enemy.maxCooldown;
-			}
-
-			// 更新顯示（顯示重置後的冷卻時間）
-			this.drawEnemies();
-
-			// 檢查玩家是否死亡
-			if (this.gameState.playerHp <= 0) {
-				this.gameOver();
-				return;
+				
+				// 更新顯示
+				this.drawEnemies();
+				
+				// 檢查玩家是否死亡
+				if (this.gameState.playerHp <= 0) {
+					this.gameOver();
+					return;
+				}
 			}
 		}
 
-		// 檢查敵人是否全滅
+		// 檢查敵人是否全滅（關卡完成）
 		if (this.gameState.enemies.length === 0) {
-			this.roundComplete();
+			this.levelComplete();
 			return;
 		}
 
-		// 回到開始階段
-		this.gameState.phase = GamePhase.START;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
-		this.generateOptions();
-		this.gameState.phase = GamePhase.PLAYER_TURN;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+		// 所有方塊行動完後，回到我方階段（完成當前回合，進入下一回合）
+		this.completeRound();
+	}
+
+	private playEnemyAttackAnimation(enemy: Enemy): Promise<void> {
+		return new Promise((resolve) => {
+			// 找到對應的敵人圖形
+			const enemyIndex = this.gameState.enemies.indexOf(enemy);
+			if (enemyIndex >= 0 && enemyIndex < this.enemyGraphics.length) {
+				const graphics = this.enemyGraphics[enemyIndex];
+				const originalY = graphics.y;
+				
+				// 上下動畫
+				this.tweens.add({
+					targets: graphics,
+					y: originalY - 5,
+					duration: 100,
+					yoyo: true,
+					ease: 'Power2',
+					onComplete: () => {
+						graphics.y = originalY;
+						resolve();
+					}
+				});
+			} else {
+				resolve();
+			}
+		});
 	}
 
 	private enemyAttack(enemy: Enemy) {
@@ -623,15 +867,52 @@ export class GameScene extends Phaser.Scene {
 		this.playerHpText.setText(`生命值: ${this.gameState.playerHp}`);
 	}
 
-	private roundComplete() {
+	/**
+	 * 完成當前回合，進入下一回合
+	 * 回合完成：敵方階段結束後，回到我方階段（不生成新敵人）
+	 * 根據規格：只有在敵人全滅時才進入下一關卡，每個回合只是階段的循環
+	 */
+	private completeRound() {
 		this.gameState.round++;
 		this.roundText.setText(`回合: ${this.gameState.round}`);
-		this.spawnEnemies();
-		this.gameState.phase = GamePhase.START;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
-		this.generateOptions();
+
+		// 進入我方階段（開始新回合）
 		this.gameState.phase = GamePhase.PLAYER_TURN;
 		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+
+		// 產生可選方塊
+		this.generateOptions();
+
+		// 更新可放置性檢查
+		this.updatePiecePlaceability();
+	}
+
+	/**
+	 * 完成當前關卡，進入下一關卡
+	 * 關卡完成：每回合的敵方全滅時
+	 */
+	private levelComplete() {
+		this.gameState.level++;
+		this.gameState.round = 1; // 重置回合數
+		this.levelText.setText(`關卡: ${this.gameState.level}`);
+		this.roundText.setText(`回合: ${this.gameState.round}`);
+		
+		// 進入開始階段（新關卡的第一回合）
+		this.gameState.phase = GamePhase.START;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+		
+		// 開始階段：生成怪物（根據新關卡數）
+		this.spawnEnemies();
+		
+		// 進入我方階段
+		this.gameState.phase = GamePhase.PLAYER_TURN;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+		
+		// 產生可選方塊
+		this.generateOptions();
+		
+		// 更新可放置性檢查
+		this.updatePiecePlaceability();
 	}
 
 	private gameOver() {
@@ -669,8 +950,22 @@ export class GameScene extends Phaser.Scene {
 	}
 
 	private startGameLoop() {
-		// 開始第一回合
+		// 開始第一關卡的第一回合
+		// 進入開始階段（每回合只會進入一次）
+		this.gameState.phase = GamePhase.START;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+		
+		// 開始階段：生成怪物
+		this.spawnEnemies();
+		
+		// 進入我方階段
 		this.gameState.phase = GamePhase.PLAYER_TURN;
 		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+		
+		// 產生可選方塊
+		this.generateOptions();
+		
+		// 更新可放置性檢查
+		this.updatePiecePlaceability();
 	}
 }
