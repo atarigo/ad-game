@@ -1,0 +1,56 @@
+{
+  "bosses": [
+    {
+      "id": "golem",
+      "name": "石像鬼",
+      "size": 3,
+      "baseHp": 100,
+      "baseAttack": 20,
+      "baseCooldown": {
+        "min": 3,
+        "max": 5
+      },
+      "color": "#9e9e9e",
+      "description": "堅硬的石頭巨人"
+    },
+    {
+      "id": "dragon",
+      "name": "火龍",
+      "size": 3,
+      "baseHp": 120,
+      "baseAttack": 25,
+      "baseCooldown": {
+        "min": 2,
+        "max": 4
+      },
+      "color": "#ff6200",
+      "description": "噴火的巨龍"
+    },
+    {
+      "id": "demon_lord",
+      "name": "魔王",
+      "size": 3,
+      "baseHp": 150,
+      "baseAttack": 30,
+      "baseCooldown": {
+        "min": 2,
+        "max": 3
+      },
+      "color": "#6a1b9a",
+      "description": "黑暗的支配者"
+    },
+    {
+      "id": "ancient_beast",
+      "name": "遠古巨獸",
+      "size": 3,
+      "baseHp": 180,
+      "baseAttack": 35,
+      "baseCooldown": {
+        "min": 3,
+        "max": 4
+      },
+      "color": "#1b5e20",
+      "description": "上古時代的恐怖生物"
+    }
+  ]
+}

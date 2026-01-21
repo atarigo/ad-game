@@ -268,16 +268,18 @@ export class GameScene extends Phaser.Scene {
 			const centerX = startX + size / 2;
 			const centerY = startY + size / 2;
 
-			// 繪製敵人方塊
+			// 繪製敵人方塊（使用敵人的顏色）
 			const graphics = this.add.graphics();
-			graphics.fillStyle(COLORS.enemy, 0.8);
+			graphics.fillStyle(enemy.color, 0.8);
 			graphics.fillRect(
 				startX + GRID_CONFIG.cellPadding,
 				startY + GRID_CONFIG.cellPadding,
 				size - GRID_CONFIG.cellPadding * 2,
 				size - GRID_CONFIG.cellPadding * 2
 			);
-			graphics.lineStyle(2, 0xcc0000, 1);
+			// Boss 使用金色邊框，普通敵人使用深色邊框
+			const borderColor = enemy.isBoss ? 0xffd700 : 0x990000;
+			graphics.lineStyle(enemy.isBoss ? 3 : 2, borderColor, 1);
 			graphics.strokeRect(
 				startX + GRID_CONFIG.cellPadding,
 				startY + GRID_CONFIG.cellPadding,
@@ -916,8 +918,8 @@ export class GameScene extends Phaser.Scene {
 	}
 
 	private enemyAttack(enemy: Enemy) {
-		// 計算傷害
-		const damage = enemy.size * 5;
+		// 使用敵人的攻擊力
+		const damage = enemy.attack;
 
 		// 造成傷害
 		this.gameState.playerHp -= damage;

@@ -1,0 +1,56 @@
+{
+  "enemies": [
+    {
+      "id": "slime",
+      "name": "史萊姆",
+      "size": 1,
+      "baseHp": 10,
+      "baseAttack": 5,
+      "baseCooldown": {
+        "min": 2,
+        "max": 4
+      },
+      "spawnWeight": 50,
+      "color": "#ff6b6b"
+    },
+    {
+      "id": "goblin",
+      "name": "哥布林",
+      "size": 1,
+      "baseHp": 15,
+      "baseAttack": 8,
+      "baseCooldown": {
+        "min": 1,
+        "max": 3
+      },
+      "spawnWeight": 30,
+      "color": "#ff8c42"
+    },
+    {
+      "id": "orc",
+      "name": "獸人",
+      "size": 2,
+      "baseHp": 25,
+      "baseAttack": 12,
+      "baseCooldown": {
+        "min": 2,
+        "max": 4
+      },
+      "spawnWeight": 15,
+      "color": "#ff5252"
+    },
+    {
+      "id": "troll",
+      "name": "巨魔",
+      "size": 2,
+      "baseHp": 30,
+      "baseAttack": 15,
+      "baseCooldown": {
+        "min": 3,
+        "max": 5
+      },
+      "spawnWeight": 5,
+      "color": "#d32f2f"
+    }
+  ]
+}

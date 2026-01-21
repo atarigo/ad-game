@@ -33,12 +33,17 @@ export interface GridPosition {
 // 敵人資料
 export interface Enemy {
 	id: string;
+	templateId: string; // 敵人模板 ID（對應 JSON 中的 id）
+	name: string; // 敵人名稱
 	position: GridPosition;
 	size: 1 | 2 | 3; // 1x1, 2x2, 3x3
 	cooldown: number; // 冷卻時間（回合數）
 	maxCooldown: number;
 	hp: number;
 	maxHp: number;
+	attack: number; // 攻擊力
+	color: number; // 顏色（十六進制）
+	isBoss?: boolean; // 是否為 Boss
 }
 
 import type { GamePhase } from './config';
