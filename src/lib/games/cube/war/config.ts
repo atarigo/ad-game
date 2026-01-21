@@ -51,12 +51,14 @@ export const COLORS = {
 	buttonHover: 0x357abd
 } as const;
 
-// 遊戲狀態
+// 遊戲階段（用於狀態機）
 export enum GamePhase {
 	MENU = 'menu',
 	START = 'start',
 	PLAYER_TURN = 'player_turn',
+	PLAYER_ATTACKING = 'player_attacking', // 子彈飛行中
 	ENEMY_TURN = 'enemy_turn',
+	LEVEL_COMPLETE_WAIT = 'level_complete_wait', // 等待關卡完成（清除子彈）
 	SKILL_SELECT = 'skill_select',
 	GAME_OVER = 'game_over'
 }

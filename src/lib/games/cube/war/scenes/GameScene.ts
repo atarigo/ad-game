@@ -33,7 +33,6 @@ export class GameScene extends Phaser.Scene {
 	private previewGridPos: GridPosition | null = null;
 	private bullets: Phaser.GameObjects.Graphics[] = [];
 	private bulletData: Array<{ graphics: Phaser.GameObjects.Graphics; startX: number; startY: number; targetY: number; speed: number; fromCell: GridPosition }> = [];
-	private shouldEndPlayerTurnAfterAttack: boolean = false; // 標記是否需要在攻擊完成後結束我方階段
 	private skillSelectUI: Phaser.GameObjects.Container | null = null; // 技能選擇 UI 容器
 	private availableSkills: Skill[] = []; // 當前可選的技能
 
@@ -122,8 +121,12 @@ export class GameScene extends Phaser.Scene {
 				return '開始階段';
 			case GamePhase.PLAYER_TURN:
 				return '我方階段';
+			case GamePhase.PLAYER_ATTACKING:
+				return '我方階段';
 			case GamePhase.ENEMY_TURN:
 				return '敵方階段';
+			case GamePhase.LEVEL_COMPLETE_WAIT:
+				return '關卡完成';
 			case GamePhase.SKILL_SELECT:
 				return '技能選擇';
 			default:
@@ -186,6 +189,12 @@ export class GameScene extends Phaser.Scene {
 	// ==================== 子彈系統 ====================
 
 	private updateBullets() {
+		// 只在 PLAYER_ATTACKING 或 LEVEL_COMPLETE_WAIT 階段更新子彈
+		if (this.gameState.phase !== GamePhase.PLAYER_ATTACKING &&
+		    this.gameState.phase !== GamePhase.LEVEL_COMPLETE_WAIT) {
+			return;
+		}
+
 		const deltaTime = this.game.loop.delta / 1000; // 轉換為秒
 
 		for (let i = this.bulletData.length - 1; i >= 0; i--) {
@@ -214,19 +223,49 @@ export class GameScene extends Phaser.Scene {
 					this.removeBullet(i);
 				}
 				this.drawEnemies();
-
-				// 檢查敵人是否全滅（關卡完成）
-				if (this.gameState.enemies.length === 0) {
-					this.levelComplete();
-				}
 				continue;
 			}
 		}
 
-		// 檢查是否所有子彈都已清除，且需要結束我方階段
-		if (this.bulletData.length === 0 && this.shouldEndPlayerTurnAfterAttack) {
-			this.shouldEndPlayerTurnAfterAttack = false;
-			this.endPlayerTurn();
+		// 檢查是否所有子彈都已清除
+		if (this.bulletData.length === 0) {
+			this.onAllBulletsCleared();
+		}
+	}
+
+	/**
+	 * 所有子彈清除完畢時的處理（狀態機轉換）
+	 */
+	private onAllBulletsCleared() {
+		switch (this.gameState.phase) {
+			case GamePhase.PLAYER_ATTACKING:
+				// 我方攻擊結束，檢查是否還有可選方塊
+				if (this.gameState.options.length === 0) {
+					// 所有方塊都已放置
+					if (this.gameState.enemies.length === 0) {
+						// 敵人全滅，進入關卡完成等待
+						this.transitionToLevelComplete();
+					} else {
+						// 還有敵人，進入敵方階段
+						this.transitionToEnemyTurn();
+					}
+				} else {
+					// 還有可選方塊，回到我方階段
+					this.gameState.phase = GamePhase.PLAYER_TURN;
+					this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+					// 更新可放置性檢查
+					this.updatePiecePlaceability();
+				}
+				break;
+
+			case GamePhase.LEVEL_COMPLETE_WAIT:
+				// 關卡完成等待結束，檢查是否需要技能選擇
+				if (SkillSystem.shouldTriggerSkillSelect(this.gameState.level)) {
+					this.transitionToSkillSelect();
+				} else {
+					this.transitionToNextLevel();
+				}
+				break;
 		}
 	}
 
@@ -249,6 +288,21 @@ export class GameScene extends Phaser.Scene {
 			this.bulletData.splice(index, 1);
 			this.bullets.splice(index, 1);
 		}
+	}
+
+	/**
+	 * 清除所有子彈
+	 */
+	private clearAllBullets() {
+		// 銷毀所有子彈圖形
+		this.bulletData.forEach(bulletInfo => {
+			if (bulletInfo.graphics) {
+				bulletInfo.graphics.destroy();
+			}
+		});
+		// 清空陣列
+		this.bulletData = [];
+		this.bullets = [];
 	}
 
 	// ==================== 敵人系統 ====================
@@ -617,6 +671,9 @@ export class GameScene extends Phaser.Scene {
 		const hasAttack = clearedRows.length > 0 || clearedCols.length > 0;
 		if (hasAttack) {
 			this.handleLineClear(clearedRows, clearedCols);
+			// 進入攻擊階段
+			this.gameState.phase = GamePhase.PLAYER_ATTACKING;
+			this.phaseText.setText(`階段: ${this.getPhaseText()}`);
 		}
 
 		// 移除已使用的選項
@@ -634,14 +691,12 @@ export class GameScene extends Phaser.Scene {
 
 		// 檢查是否所有可選方塊都已放置
 		if (this.gameState.options.length === 0) {
-			// 根據規格：若所有可選方塊都已放置，在消除方塊（攻擊敵方）完成後，直接進入敵方階段
-			if (hasAttack && this.bulletData.length > 0) {
-				// 如果有攻擊且有子彈正在飛行，設置標記等待攻擊完成
-				this.shouldEndPlayerTurnAfterAttack = true;
-			} else {
-				// 沒有攻擊或子彈已經清空，直接進入敵方階段
-				this.endPlayerTurn();
+			// 若所有可選方塊都已放置
+			if (!hasAttack) {
+				// 沒有攻擊，直接進入敵方階段
+				this.transitionToEnemyTurn();
 			}
+			// 如果有攻擊，等待子彈清除完畢（在 onAllBulletsCleared 中處理）
 		} else {
 			// 更新索引並重新設置拖曳事件
 			this.optionPieces.forEach((container, index) => {
@@ -845,21 +900,22 @@ export class GameScene extends Phaser.Scene {
 		if (this.skipButton) {
 			return; // 已經顯示
 		}
-		
+
 		const buttonX = GAME_WIDTH / 2;
 		const buttonY = GAME_HEIGHT - 30;
-		
+
 		const buttonBg = this.add.rectangle(buttonX, buttonY, 150, 40, COLORS.button, 0.9);
 		const buttonText = this.add.text(buttonX, buttonY, '跳過階段', {
 			fontSize: '18px',
 			color: '#ffffff'
 		}).setOrigin(0.5);
-		
+
 		buttonBg.setInteractive({ useHandCursor: true });
 		buttonBg.on('pointerdown', () => {
-			this.endPlayerTurn();
+			this.hideSkipButton();
+			this.transitionToEnemyTurn();
 		});
-		
+
 		this.skipButton = this.add.container(0, 0);
 		this.skipButton.add([buttonBg, buttonText]);
 		this.skipButton.setDepth(100);
@@ -916,7 +972,7 @@ export class GameScene extends Phaser.Scene {
 
 		// 檢查敵人是否全滅（關卡完成）
 		if (this.gameState.enemies.length === 0) {
-			this.levelComplete();
+			this.transitionToLevelComplete();
 			return;
 		}
 
@@ -994,47 +1050,100 @@ export class GameScene extends Phaser.Scene {
 		});
 	}
 
-	// ==================== 回合與關卡管理 ====================
+	// ==================== 狀態機轉換方法 ====================
 
 	/**
-	 * 完成當前回合，進入下一回合
-	 * 根據規格：敵方階段結束後，回到我方階段（不生成新敵人）
-	 * 只有在敵人全滅時才進入下一關卡，每個回合只是階段的循環
+	 * 轉換到關卡完成等待狀態
+	 */
+	private transitionToLevelComplete() {
+		this.gameState.phase = GamePhase.LEVEL_COMPLETE_WAIT;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+	}
+
+	/**
+	 * 轉換到敵方階段
+	 */
+	private async transitionToEnemyTurn() {
+		this.gameState.phase = GamePhase.ENEMY_TURN;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+
+		// 顯示階段通知
+		await this.showPhaseNotification('敵方階段');
+
+		// 處理敵方回合
+		this.processEnemyTurn();
+	}
+
+	/**
+	 * 轉換到下一回合（回到我方階段）
 	 */
 	private completeRound() {
 		this.gameState.round++;
 		this.roundText.setText(`回合: ${this.gameState.round}`);
 
 		// 進入我方階段（開始新回合）
-		this.enterPlayerPhase();
+		this.transitionToPlayerTurn();
 	}
 
 	/**
-	 * 完成當前關卡，進入下一關卡
-	 * 根據規格：關卡包含數個回合，直到敵方方塊全滅則進入下一關卡
+	 * 轉換到我方階段
 	 */
-	private levelComplete() {
-		// 檢查是否觸發技能選擇（每5關）
-		if (SkillSystem.shouldTriggerSkillSelect(this.gameState.level)) {
-			// 進入技能選擇階段
-			this.enterSkillSelectPhase();
-		} else {
-			// 直接進入下一關
-			this.proceedToNextLevel();
-		}
+	private async transitionToPlayerTurn() {
+		this.gameState.phase = GamePhase.PLAYER_TURN;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+
+		// 顯示階段通知
+		await this.showPhaseNotification('我方階段');
+
+		// 產生可選方塊
+		this.generateOptions();
+
+		// 更新可放置性檢查
+		this.updatePiecePlaceability();
 	}
 
 	/**
-	 * 進入下一關卡
+	 * 轉換到技能選擇階段
 	 */
-	private proceedToNextLevel() {
+	private async transitionToSkillSelect() {
+		this.gameState.phase = GamePhase.SKILL_SELECT;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+
+		// 顯示階段通知
+		await this.showPhaseNotification('技能選擇');
+
+		// 生成3個隨機技能
+		this.availableSkills = SkillSystem.getRandomSkills(3);
+
+		// 顯示技能選擇 UI
+		this.showSkillSelectUI();
+	}
+
+	/**
+	 * 轉換到下一關卡
+	 */
+	private transitionToNextLevel() {
 		this.gameState.level++;
 		this.gameState.round = 1; // 重置回合數
 		this.levelText.setText(`關卡: ${this.gameState.level}`);
 		this.roundText.setText(`回合: ${this.gameState.round}`);
 
 		// 進入開始階段（新關卡的第一回合）
-		this.enterStartPhase();
+		this.transitionToStartPhase();
+	}
+
+	/**
+	 * 轉換到開始階段
+	 */
+	private transitionToStartPhase() {
+		this.gameState.phase = GamePhase.START;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+
+		// 生成怪物（根據當前關卡數）
+		this.spawnEnemies();
+
+		// 自動進入我方階段
+		this.transitionToPlayerTurn();
 	}
 
 	/**
@@ -1053,10 +1162,10 @@ export class GameScene extends Phaser.Scene {
 	 * 從關卡1、回合1開始
 	 */
 	private startGameLoop() {
-		this.enterStartPhase();
+		this.transitionToStartPhase();
 	}
 
-	// ==================== 階段管理 ====================
+	// ==================== UI 通知 ====================
 
 	/**
 	 * 顯示階段通知
@@ -1105,90 +1214,7 @@ export class GameScene extends Phaser.Scene {
 		});
 	}
 
-	/**
-	 * 進入開始階段
-	 * 根據規格：此階段每回合只會進入一次，生成怪物
-	 */
-	private enterStartPhase() {
-		this.gameState.phase = GamePhase.START;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
-
-		// 生成怪物（根據當前關卡數）
-		this.spawnEnemies();
-
-		// 自動進入我方階段
-		this.enterPlayerPhase();
-	}
-
-	/**
-	 * 進入我方階段
-	 * 根據規格：
-	 * 1. 產生可選方塊
-	 * 2. 玩家放置可選方塊
-	 * 3. 判斷是否可消除（攻擊敵方）
-	 * 4. 判斷剩餘可選方塊是否可以繼續放置
-	 * 5. 若剩餘可選方塊都無法放置，顯示按鈕跳出階段，即進入敵方階段
-	 * 6. 若所有可選方塊都已放置，在消除方塊（攻擊敵方）完成後，直接進入敵方階段
-	 */
-	private async enterPlayerPhase() {
-		this.gameState.phase = GamePhase.PLAYER_TURN;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
-
-		// 顯示階段通知
-		await this.showPhaseNotification('我方階段');
-
-		// 產生可選方塊
-		this.generateOptions();
-
-		// 更新可放置性檢查
-		this.updatePiecePlaceability();
-	}
-
-	/**
-	 * 結束我方階段，進入敵方階段
-	 */
-	private endPlayerTurn() {
-		this.hideSkipButton();
-		this.enterEnemyPhase();
-	}
-
-	/**
-	 * 進入敵方階段
-	 * 根據規格：
-	 * 1. 依序走訪每個敵方方塊
-	 * 2. 減少方塊的行動冷卻時間 -1
-	 * 3. 若方塊冷卻結束，則上下位移動一下，對我方生命進行攻擊，在重置冷卻時間
-	 * 4. 所有方塊行動完後，回到我方階段
-	 */
-	private async enterEnemyPhase() {
-		this.gameState.phase = GamePhase.ENEMY_TURN;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
-
-		// 顯示階段通知
-		await this.showPhaseNotification('敵方階段');
-
-		// 處理敵方回合
-		this.processEnemyTurn();
-	}
-
-	// ==================== 技能選擇階段 ====================
-
-	/**
-	 * 進入技能選擇階段
-	 */
-	private async enterSkillSelectPhase() {
-		this.gameState.phase = GamePhase.SKILL_SELECT;
-		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
-
-		// 顯示階段通知
-		await this.showPhaseNotification('技能選擇');
-
-		// 生成3個隨機技能
-		this.availableSkills = SkillSystem.getRandomSkills(3);
-
-		// 顯示技能選擇 UI
-		this.showSkillSelectUI();
-	}
+	// ==================== 技能選擇 UI ====================
 
 	/**
 	 * 顯示技能選擇 UI
@@ -1227,6 +1253,9 @@ export class GameScene extends Phaser.Scene {
 		const startX = (GAME_WIDTH - totalWidth) / 2;
 		const cardY = GAME_HEIGHT / 2;
 
+		// 保存所有卡片以便禁用
+		const cards: Phaser.GameObjects.Rectangle[] = [];
+
 		this.availableSkills.forEach((skill, index) => {
 			const cardX = startX + index * (cardWidth + spacing) + cardWidth / 2;
 
@@ -1234,6 +1263,7 @@ export class GameScene extends Phaser.Scene {
 			const card = this.add.rectangle(cardX, cardY, cardWidth, cardHeight, 0x2a2a3e, 1);
 			card.setStrokeStyle(2, 0x4a90e2);
 			card.setInteractive({ useHandCursor: true });
+			cards.push(card);
 
 			// 圖標
 			const icon = this.add
@@ -1264,17 +1294,23 @@ export class GameScene extends Phaser.Scene {
 
 			// 懸停效果
 			card.on('pointerover', () => {
-				card.setFillStyle(0x3a3a4e);
-				card.setStrokeStyle(3, 0x5aa0f2);
+				if (card.input && card.input.enabled) {
+					card.setFillStyle(0x3a3a4e);
+					card.setStrokeStyle(3, 0x5aa0f2);
+				}
 			});
 
 			card.on('pointerout', () => {
-				card.setFillStyle(0x2a2a3e);
-				card.setStrokeStyle(2, 0x4a90e2);
+				if (card.input && card.input.enabled) {
+					card.setFillStyle(0x2a2a3e);
+					card.setStrokeStyle(2, 0x4a90e2);
+				}
 			});
 
 			// 點擊選擇技能
 			card.on('pointerdown', () => {
+				// 禁用所有卡片，防止重複點擊
+				cards.forEach(c => c.disableInteractive());
 				this.selectSkill(skill);
 			});
 
@@ -1285,24 +1321,27 @@ export class GameScene extends Phaser.Scene {
 	/**
 	 * 選擇技能
 	 */
-	private selectSkill(skill: Skill) {
+	private async selectSkill(skill: Skill) {
+		// 防止重複點擊
+		if (!this.skillSelectUI) return;
+
 		// 應用技能效果
 		SkillSystem.applySkill(skill, this.gameState);
 
 		// 更新 UI（生命值可能改變）
 		this.playerHpText.setText(`生命值: ${this.gameState.playerHp}/${this.gameState.playerMaxHp}`);
 
-		// 顯示技能獲得通知
-		this.showSkillAcquiredNotification(skill);
-
-		// 清除技能選擇 UI
+		// 先清除技能選擇 UI
 		if (this.skillSelectUI) {
 			this.skillSelectUI.destroy();
 			this.skillSelectUI = null;
 		}
 
+		// 等待技能獲得通知顯示完畢
+		await this.showSkillAcquiredNotification(skill);
+
 		// 進入下一關
-		this.proceedToNextLevel();
+		this.transitionToNextLevel();
 	}
 
 	/**

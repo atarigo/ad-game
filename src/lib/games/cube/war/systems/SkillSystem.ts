@@ -143,8 +143,9 @@ export class SkillSystem {
 
 	/**
 	 * 檢查是否應該觸發技能選擇（每5關）
+	 * @param level 當前完成的關卡數
 	 */
 	static shouldTriggerSkillSelect(level: number): boolean {
-		return level > 1 && (level - 1) % 5 === 0;
+		return level % 5 === 0;
 	}
 }
