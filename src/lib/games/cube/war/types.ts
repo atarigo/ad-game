@@ -46,15 +46,53 @@ export interface Enemy {
 	isBoss?: boolean; // 是否為 Boss
 }
 
+// 技能效果類型
+export type SkillEffectType =
+	| 'max_hp'
+	| 'heal'
+	| 'bullet_damage'
+	| 'double_bullet'
+	| 'enemy_slow'
+	| 'pierce'
+	| 'critical'
+	| 'shield'
+	| 'grid_expand'
+	| 'more_options';
+
+// 技能資料
+export interface Skill {
+	id: string;
+	name: string;
+	description: string;
+	icon: string;
+	effectType: SkillEffectType;
+	value: number;
+}
+
+// 玩家技能狀態（追蹤已獲得的技能效果）
+export interface PlayerSkills {
+	maxHpBoost: number; // 最大生命值增加
+	bulletDamage: number; // 子彈傷害加成
+	doubleBullet: boolean; // 是否有雙重射擊
+	pierceActive: boolean; // 是否有穿透效果
+	criticalChance: number; // 暴擊機率
+	shieldCount: number; // 護盾數量
+	enemySlowBoost: number; // 敵人冷卻增加
+	moreOptionsCount: number; // 額外可選方塊數量
+	acquiredSkills: string[]; // 已獲得的技能ID列表
+}
+
 import type { GamePhase } from './config';
 
 // 遊戲狀態
 export interface GameState {
 	phase: GamePhase;
 	playerHp: number;
+	playerMaxHp: number; // 最大生命值
 	level: number; // 關卡數
 	round: number; // 回合數（在當前關卡內）
 	enemies: Enemy[];
 	playerGrid: (number | null)[][]; // null 表示空，數字表示方塊ID
 	options: TetrisPiece[];
+	skills: PlayerSkills; // 玩家技能狀態
 }

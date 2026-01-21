@@ -57,6 +57,7 @@ export enum GamePhase {
 	START = 'start',
 	PLAYER_TURN = 'player_turn',
 	ENEMY_TURN = 'enemy_turn',
+	SKILL_SELECT = 'skill_select',
 	GAME_OVER = 'game_over'
 }
 

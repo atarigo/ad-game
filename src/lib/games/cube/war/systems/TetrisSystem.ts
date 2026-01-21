@@ -145,14 +145,15 @@ export class TetrisSystem {
 	}
 
 	/**
-	 * 生成三個隨機方塊作為選項
+	 * 生成隨機方塊作為選項
+	 * @param count 生成的方塊數量，預設為3
 	 */
-	static generateOptions(): TetrisPiece[] {
-		return [
-			this.generateRandomPiece(),
-			this.generateRandomPiece(),
-			this.generateRandomPiece()
-		];
+	static generateOptions(count: number = 3): TetrisPiece[] {
+		const options: TetrisPiece[] = [];
+		for (let i = 0; i < count; i++) {
+			options.push(this.generateRandomPiece());
+		}
+		return options;
 	}
 
 	/**

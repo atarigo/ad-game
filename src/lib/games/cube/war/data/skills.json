@@ -1,0 +1,84 @@
+{
+  "skills": [
+    {
+      "id": "max_hp_boost",
+      "name": "生命強化",
+      "description": "最大生命值永久增加20點",
+      "icon": "❤️",
+      "effectType": "max_hp",
+      "value": 20
+    },
+    {
+      "id": "hp_recovery",
+      "name": "生命恢復",
+      "description": "立即恢復30點生命值",
+      "icon": "💚",
+      "effectType": "heal",
+      "value": 30
+    },
+    {
+      "id": "bullet_damage_boost",
+      "name": "火力強化",
+      "description": "子彈傷害永久增加5點",
+      "icon": "💥",
+      "effectType": "bullet_damage",
+      "value": 5
+    },
+    {
+      "id": "double_bullet",
+      "name": "雙重射擊",
+      "description": "消除方塊時發射兩發子彈",
+      "icon": "🔫",
+      "effectType": "double_bullet",
+      "value": 1
+    },
+    {
+      "id": "enemy_slow",
+      "name": "時間減速",
+      "description": "所有敵人冷卻時間增加1回合",
+      "icon": "⏰",
+      "effectType": "enemy_slow",
+      "value": 1
+    },
+    {
+      "id": "pierce_bullet",
+      "name": "穿透彈",
+      "description": "子彈可以穿透敵人繼續攻擊",
+      "icon": "⚡",
+      "effectType": "pierce",
+      "value": 1
+    },
+    {
+      "id": "lucky_strike",
+      "name": "幸運一擊",
+      "description": "10%機率造成雙倍傷害",
+      "icon": "🍀",
+      "effectType": "critical",
+      "value": 0.1
+    },
+    {
+      "id": "shield",
+      "name": "護盾",
+      "description": "獲得一次免疫傷害的護盾",
+      "icon": "🛡️",
+      "effectType": "shield",
+      "value": 1
+    },
+    {
+      "id": "grid_expand",
+      "name": "空間擴展",
+      "description": "玩家格子增加一行",
+      "icon": "📐",
+      "effectType": "grid_expand",
+      "value": 1
+    },
+    {
+      "id": "option_boost",
+      "name": "選擇增強",
+      "description": "每回合可選方塊增加1個",
+      "icon": "🎲",
+      "effectType": "more_options",
+      "value": 1
+    }
+  ]
+}

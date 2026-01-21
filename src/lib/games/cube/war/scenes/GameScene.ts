@@ -11,7 +11,8 @@ import {
 import { GridSystem } from '../systems/GridSystem';
 import { TetrisSystem } from '../systems/TetrisSystem';
 import { EnemySystem } from '../systems/EnemySystem';
-import type { TetrisPiece, GridPosition, Enemy, GameState } from '../types';
+import { SkillSystem } from '../systems/SkillSystem';
+import type { TetrisPiece, GridPosition, Enemy, GameState, Skill } from '../types';
 
 export class GameScene extends Phaser.Scene {
 	private gameState!: GameState;
@@ -33,6 +34,8 @@ export class GameScene extends Phaser.Scene {
 	private bullets: Phaser.GameObjects.Graphics[] = [];
 	private bulletData: Array<{ graphics: Phaser.GameObjects.Graphics; startX: number; startY: number; targetY: number; speed: number; fromCell: GridPosition }> = [];
 	private shouldEndPlayerTurnAfterAttack: boolean = false; // 標記是否需要在攻擊完成後結束我方階段
+	private skillSelectUI: Phaser.GameObjects.Container | null = null; // 技能選擇 UI 容器
+	private availableSkills: Skill[] = []; // 當前可選的技能
 
 	constructor() {
 		super({ key: 'GameScene' });
@@ -65,13 +68,15 @@ export class GameScene extends Phaser.Scene {
 		this.gameState = {
 			phase: GamePhase.START,
 			playerHp: PLAYER_HP,
+			playerMaxHp: PLAYER_HP,
 			level: 1, // 從關卡1開始
 			round: 1, // 從回合1開始
 			enemies: [],
 			playerGrid: Array(GRID_CONFIG.playerRows)
 				.fill(null)
 				.map(() => Array(GRID_CONFIG.playerCols).fill(null)),
-			options: []
+			options: [],
+			skills: SkillSystem.initPlayerSkills()
 		};
 	}
 
@@ -81,7 +86,7 @@ export class GameScene extends Phaser.Scene {
 		// 左上方
 		// 玩家生命值（第一行）
 		this.playerHpText = this.add
-			.text(10, 30, `生命值: ${this.gameState.playerHp}`, {
+			.text(10, 30, `生命值: ${this.gameState.playerHp}/${this.gameState.playerMaxHp}`, {
 				fontSize: '16px',
 				color: COLORS.text
 			});
@@ -119,6 +124,8 @@ export class GameScene extends Phaser.Scene {
 				return '我方階段';
 			case GamePhase.ENEMY_TURN:
 				return '敵方階段';
+			case GamePhase.SKILL_SELECT:
+				return '技能選擇';
 			default:
 				return '';
 		}
@@ -198,9 +205,14 @@ export class GameScene extends Phaser.Scene {
 			// 檢查是否碰撞到敵方方塊
 			const hitEnemy = this.checkBulletEnemyCollision(bullet);
 			if (hitEnemy) {
-				// 子彈碰撞到敵人，直接對該敵人造成傷害
-				this.damageEnemy(hitEnemy, 10);
-				this.removeBullet(i);
+				// 子彈碰撞到敵人，使用技能系統計算傷害
+				const damage = SkillSystem.calculateBulletDamage(this.gameState.skills);
+				this.damageEnemy(hitEnemy, damage);
+
+				// 如果沒有穿透效果，移除子彈
+				if (!this.gameState.skills.pierceActive) {
+					this.removeBullet(i);
+				}
 				this.drawEnemies();
 
 				// 檢查敵人是否全滅（關卡完成）
@@ -244,6 +256,15 @@ export class GameScene extends Phaser.Scene {
 	private spawnEnemies() {
 		// 根據關卡數生成敵人（關卡越高，敵人越強）
 		this.gameState.enemies = EnemySystem.generateEnemies(this.gameState.level);
+
+		// 應用技能效果：增加敵人冷卻時間
+		if (this.gameState.skills.enemySlowBoost > 0) {
+			this.gameState.enemies.forEach(enemy => {
+				enemy.maxCooldown += this.gameState.skills.enemySlowBoost;
+				enemy.cooldown += this.gameState.skills.enemySlowBoost;
+			});
+		}
+
 		this.drawEnemies();
 	}
 
@@ -343,12 +364,14 @@ export class GameScene extends Phaser.Scene {
 		this.optionPieces.forEach((container) => container.destroy());
 		this.optionPieces = [];
 
-		this.gameState.options = TetrisSystem.generateOptions();
+		// 根據技能決定生成的選項數量（基礎3個 + 技能加成）
+		const optionCount = SkillSystem.getOptionCount(this.gameState.skills);
+		this.gameState.options = TetrisSystem.generateOptions(optionCount);
 
-		// 調整選項區域寬度，確保三個區域不重疊，並留出間距
+		// 調整選項區域寬度，根據選項數量動態調整
 		const optionSpacing = 8; // 選項之間的間距
-		const totalSpacing = optionSpacing * 2; // 兩側間距
-		const optionWidth = (GAME_WIDTH - AREA_POSITIONS.optionArea.x * 2 - totalSpacing) / 3;
+		const totalSpacing = optionSpacing * (this.gameState.options.length - 1); // 間距總和
+		const optionWidth = (GAME_WIDTH - AREA_POSITIONS.optionArea.x * 2 - totalSpacing) / this.gameState.options.length;
 		const optionStartX = AREA_POSITIONS.optionArea.x;
 		const optionY = AREA_POSITIONS.optionArea.y + GRID_CONFIG.optionAreaHeight / 2;
 
@@ -678,30 +701,40 @@ export class GameScene extends Phaser.Scene {
 		return new Promise((resolve) => {
 			// 計算起始位置（玩家區域的格子中心）
 			const startPos = GridSystem.gridToWorld(fromCell, 'player');
-			
+
 			// 計算目標位置（畫面上方）
 			const targetY = AREA_POSITIONS.enemyArea.y - 20;
-			
-			// 創建子彈圖形
-			const bullet = this.add.graphics();
-			bullet.fillStyle(0x00ff00, 1);
-			bullet.fillCircle(0, 0, 5);
-			bullet.x = startPos.x;
-			bullet.y = startPos.y;
-			bullet.setDepth(50);
-			
-			// 保存子彈數據（使用手動更新而不是 tween）
-			const bulletInfo = {
-				graphics: bullet,
-				startX: startPos.x,
-				startY: startPos.y,
-				targetY: targetY,
-				speed: 300, // 像素/秒
-				fromCell: fromCell
+
+			// 創建子彈的函數
+			const createBullet = (offsetX: number = 0) => {
+				const bullet = this.add.graphics();
+				bullet.fillStyle(0x00ff00, 1);
+				bullet.fillCircle(0, 0, 5);
+				bullet.x = startPos.x + offsetX;
+				bullet.y = startPos.y;
+				bullet.setDepth(50);
+
+				// 保存子彈數據（使用手動更新而不是 tween）
+				const bulletInfo = {
+					graphics: bullet,
+					startX: startPos.x + offsetX,
+					startY: startPos.y,
+					targetY: targetY,
+					speed: 300, // 像素/秒
+					fromCell: fromCell
+				};
+				this.bulletData.push(bulletInfo);
+				this.bullets.push(bullet);
 			};
-			this.bulletData.push(bulletInfo);
-			this.bullets.push(bullet);
-			
+
+			// 發射第一發子彈
+			createBullet(0);
+
+			// 如果有雙重射擊技能，發射第二發子彈（稍微偏移）
+			if (this.gameState.skills.doubleBullet) {
+				createBullet(10); // 向右偏移10像素
+			}
+
 			resolve();
 		});
 	}
@@ -921,20 +954,29 @@ export class GameScene extends Phaser.Scene {
 		// 使用敵人的攻擊力
 		const damage = enemy.attack;
 
-		// 造成傷害
-		this.gameState.playerHp -= damage;
-		this.playerHpText.setText(`生命值: ${this.gameState.playerHp}`);
+		// 檢查是否有護盾
+		if (SkillSystem.hasShield(this.gameState.skills)) {
+			// 消耗護盾，不受到傷害
+			SkillSystem.consumeShield(this.gameState.skills);
+			this.showDamageText(0, true); // 顯示被格擋
+		} else {
+			// 造成傷害
+			this.gameState.playerHp -= damage;
+			this.showDamageText(damage, false);
+		}
 
-		// 顯示傷害數字（在生命值文字旁邊）
-		this.showDamageText(damage);
+		this.playerHpText.setText(`生命值: ${this.gameState.playerHp}/${this.gameState.playerMaxHp}`);
 	}
 
-	private showDamageText(damage: number) {
-		// 在生命值文字右側顯示傷害
+	private showDamageText(damage: number, blocked: boolean = false) {
+		// 在生命值文字右側顯示傷害或格擋
+		const text = blocked ? '格擋!' : `-${damage}`;
+		const color = blocked ? '#00ffff' : '#ff0000';
+
 		const damageText = this.add
-			.text(this.playerHpText.x + this.playerHpText.width + 10, this.playerHpText.y, `-${damage}`, {
+			.text(this.playerHpText.x + this.playerHpText.width + 10, this.playerHpText.y, text, {
 				fontSize: '20px',
-				color: '#ff0000',
+				color: color,
 				fontStyle: 'bold'
 			})
 			.setOrigin(0, 0);
@@ -972,6 +1014,20 @@ export class GameScene extends Phaser.Scene {
 	 * 根據規格：關卡包含數個回合，直到敵方方塊全滅則進入下一關卡
 	 */
 	private levelComplete() {
+		// 檢查是否觸發技能選擇（每5關）
+		if (SkillSystem.shouldTriggerSkillSelect(this.gameState.level)) {
+			// 進入技能選擇階段
+			this.enterSkillSelectPhase();
+		} else {
+			// 直接進入下一關
+			this.proceedToNextLevel();
+		}
+	}
+
+	/**
+	 * 進入下一關卡
+	 */
+	private proceedToNextLevel() {
 		this.gameState.level++;
 		this.gameState.round = 1; // 重置回合數
 		this.levelText.setText(`關卡: ${this.gameState.level}`);
@@ -1113,5 +1169,187 @@ export class GameScene extends Phaser.Scene {
 
 		// 處理敵方回合
 		this.processEnemyTurn();
+	}
+
+	// ==================== 技能選擇階段 ====================
+
+	/**
+	 * 進入技能選擇階段
+	 */
+	private async enterSkillSelectPhase() {
+		this.gameState.phase = GamePhase.SKILL_SELECT;
+		this.phaseText.setText(`階段: ${this.getPhaseText()}`);
+
+		// 顯示階段通知
+		await this.showPhaseNotification('技能選擇');
+
+		// 生成3個隨機技能
+		this.availableSkills = SkillSystem.getRandomSkills(3);
+
+		// 顯示技能選擇 UI
+		this.showSkillSelectUI();
+	}
+
+	/**
+	 * 顯示技能選擇 UI
+	 */
+	private showSkillSelectUI() {
+		// 創建容器
+		this.skillSelectUI = this.add.container(0, 0);
+		this.skillSelectUI.setDepth(2000);
+
+		// 半透明黑色背景
+		const bg = this.add.rectangle(
+			GAME_WIDTH / 2,
+			GAME_HEIGHT / 2,
+			GAME_WIDTH,
+			GAME_HEIGHT,
+			0x000000,
+			0.85
+		);
+		this.skillSelectUI.add(bg);
+
+		// 標題
+		const title = this.add
+			.text(GAME_WIDTH / 2, 80, '選擇一個技能', {
+				fontSize: '32px',
+				color: '#ffffff',
+				fontStyle: 'bold'
+			})
+			.setOrigin(0.5);
+		this.skillSelectUI.add(title);
+
+		// 為每個技能創建卡片
+		const cardWidth = 100;
+		const cardHeight = 140;
+		const spacing = 10;
+		const totalWidth = cardWidth * 3 + spacing * 2;
+		const startX = (GAME_WIDTH - totalWidth) / 2;
+		const cardY = GAME_HEIGHT / 2;
+
+		this.availableSkills.forEach((skill, index) => {
+			const cardX = startX + index * (cardWidth + spacing) + cardWidth / 2;
+
+			// 卡片背景
+			const card = this.add.rectangle(cardX, cardY, cardWidth, cardHeight, 0x2a2a3e, 1);
+			card.setStrokeStyle(2, 0x4a90e2);
+			card.setInteractive({ useHandCursor: true });
+
+			// 圖標
+			const icon = this.add
+				.text(cardX, cardY - 40, skill.icon, {
+					fontSize: '32px'
+				})
+				.setOrigin(0.5);
+
+			// 名稱
+			const name = this.add
+				.text(cardX, cardY - 5, skill.name, {
+					fontSize: '14px',
+					color: '#ffffff',
+					fontStyle: 'bold',
+					wordWrap: { width: cardWidth - 10 }
+				})
+				.setOrigin(0.5);
+
+			// 描述
+			const desc = this.add
+				.text(cardX, cardY + 30, skill.description, {
+					fontSize: '10px',
+					color: '#cccccc',
+					wordWrap: { width: cardWidth - 10 },
+					align: 'center'
+				})
+				.setOrigin(0.5);
+
+			// 懸停效果
+			card.on('pointerover', () => {
+				card.setFillStyle(0x3a3a4e);
+				card.setStrokeStyle(3, 0x5aa0f2);
+			});
+
+			card.on('pointerout', () => {
+				card.setFillStyle(0x2a2a3e);
+				card.setStrokeStyle(2, 0x4a90e2);
+			});
+
+			// 點擊選擇技能
+			card.on('pointerdown', () => {
+				this.selectSkill(skill);
+			});
+
+			this.skillSelectUI.add([card, icon, name, desc]);
+		});
+	}
+
+	/**
+	 * 選擇技能
+	 */
+	private selectSkill(skill: Skill) {
+		// 應用技能效果
+		SkillSystem.applySkill(skill, this.gameState);
+
+		// 更新 UI（生命值可能改變）
+		this.playerHpText.setText(`生命值: ${this.gameState.playerHp}/${this.gameState.playerMaxHp}`);
+
+		// 顯示技能獲得通知
+		this.showSkillAcquiredNotification(skill);
+
+		// 清除技能選擇 UI
+		if (this.skillSelectUI) {
+			this.skillSelectUI.destroy();
+			this.skillSelectUI = null;
+		}
+
+		// 進入下一關
+		this.proceedToNextLevel();
+	}
+
+	/**
+	 * 顯示技能獲得通知
+	 */
+	private async showSkillAcquiredNotification(skill: Skill): Promise<void> {
+		return new Promise((resolve) => {
+			// 半透明背景
+			const bg = this.add
+				.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.5)
+				.setDepth(3000);
+
+			// 通知文字
+			const text = this.add
+				.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `獲得技能\n${skill.icon} ${skill.name}`, {
+					fontSize: '28px',
+					color: '#00ff00',
+					fontStyle: 'bold',
+					align: 'center'
+				})
+				.setOrigin(0.5)
+				.setDepth(3001)
+				.setAlpha(0);
+
+			// 淡入動畫
+			this.tweens.add({
+				targets: text,
+				alpha: 1,
+				duration: 300,
+				ease: 'Power2',
+				onComplete: () => {
+					// 顯示1秒後淡出
+					this.time.delayedCall(1000, () => {
+						this.tweens.add({
+							targets: [bg, text],
+							alpha: 0,
+							duration: 300,
+							ease: 'Power2',
+							onComplete: () => {
+								bg.destroy();
+								text.destroy();
+								resolve();
+							}
+						});
+					});
+				}
+			});
+		});
 	}
 }
