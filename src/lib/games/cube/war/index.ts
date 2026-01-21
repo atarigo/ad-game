@@ -6,7 +6,8 @@ export { GAME_WIDTH, GAME_HEIGHT } from './config';
 export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 	// 動態載入 Phaser，避免 SSR 問題
 	const Phaser = await import('phaser');
-	const { MainScene } = await import('./scenes/MainScene');
+	const { MenuScene } = await import('./scenes/MenuScene');
+	const { GameScene } = await import('./scenes/GameScene');
 
 	const config: Phaser.Types.Core.GameConfig = {
 		type: Phaser.AUTO,
@@ -14,7 +15,7 @@ export async function createGame(parent: HTMLElement): Promise<Phaser.Game> {
 		width: GAME_WIDTH,
 		height: GAME_HEIGHT,
 		backgroundColor: COLORS.background,
-		scene: [MainScene],
+		scene: [MenuScene, GameScene],
 		scale: {
 			mode: Phaser.Scale.FIT,
 			autoCenter: Phaser.Scale.CENTER_BOTH
