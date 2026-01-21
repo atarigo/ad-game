@@ -1,5 +1,21 @@
-// 俄羅斯方塊類型
-export type TetrisPieceType = 'I' | 'O' | 'T' | 'S' | 'Z' | 'J' | 'L';
+// 方塊類型
+export type TetrisPieceType =
+	| 'I'
+	| 'O'
+	| 'T'
+	| 'S'
+	| 'Z'
+	| 'J'
+	| 'L'
+	| '1x1'
+	| '2x1'
+	| '1x2'
+	| '1x3'
+	| '3x1'
+	| '2x2_TL'
+	| '2x2_TR'
+	| '2x2_BL'
+	| '2x2_BR';
 
 // 方塊形狀定義（相對於中心點的偏移）
 export interface TetrisPiece {

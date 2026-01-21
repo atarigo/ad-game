@@ -68,23 +68,23 @@ export class GameScene extends Phaser.Scene {
 	}
 
 	private drawUI() {
-		// 玩家生命值
+		// 玩家生命值（增加上方間距，避免被遮住）
 		this.playerHpText = this.add
-			.text(10, 10, `生命值: ${this.gameState.playerHp}`, {
+			.text(10, 20, `生命值: ${this.gameState.playerHp}`, {
 				fontSize: '16px',
 				color: COLORS.text
 			});
 
 		// 回合數
 		this.roundText = this.add
-			.text(10, 30, `回合: ${this.gameState.round}`, {
+			.text(10, 40, `回合: ${this.gameState.round}`, {
 				fontSize: '16px',
 				color: COLORS.text
 			});
 
 		// 階段
 		this.phaseText = this.add
-			.text(10, 50, `階段: ${this.getPhaseText()}`, {
+			.text(10, 60, `階段: ${this.getPhaseText()}`, {
 				fontSize: '16px',
 				color: COLORS.text
 			});
@@ -168,22 +168,32 @@ export class GameScene extends Phaser.Scene {
 		this.enemyTexts = [];
 
 		for (const enemy of this.gameState.enemies) {
-			const worldPos = GridSystem.gridToWorld(enemy.position, 'enemy');
+			// 使用左上角位置計算世界座標
+			const topLeftWorldPos = GridSystem.gridToWorld(enemy.position, 'enemy');
+			// 調整到格子的左上角（而不是中心）
+			const cellSize = GRID_CONFIG.cellSize;
+			const startX = topLeftWorldPos.x - cellSize / 2;
+			const startY = topLeftWorldPos.y - cellSize / 2;
+			
 			const size = enemy.size * GRID_CONFIG.cellSize;
+			
+			// 計算方塊的中心位置（用於顯示）
+			const centerX = startX + size / 2;
+			const centerY = startY + size / 2;
 
 			// 繪製敵人方塊
 			const graphics = this.add.graphics();
 			graphics.fillStyle(COLORS.enemy, 0.8);
 			graphics.fillRect(
-				worldPos.x - size / 2,
-				worldPos.y - size / 2,
+				startX + GRID_CONFIG.cellPadding,
+				startY + GRID_CONFIG.cellPadding,
 				size - GRID_CONFIG.cellPadding * 2,
 				size - GRID_CONFIG.cellPadding * 2
 			);
 			graphics.lineStyle(2, 0xcc0000, 1);
 			graphics.strokeRect(
-				worldPos.x - size / 2,
-				worldPos.y - size / 2,
+				startX + GRID_CONFIG.cellPadding,
+				startY + GRID_CONFIG.cellPadding,
 				size - GRID_CONFIG.cellPadding * 2,
 				size - GRID_CONFIG.cellPadding * 2
 			);
@@ -191,7 +201,7 @@ export class GameScene extends Phaser.Scene {
 			// 顯示冷卻時間
 			if (enemy.cooldown > 0) {
 				const cooldownText = this.add
-					.text(worldPos.x - size / 2 + 5, worldPos.y - size / 2 + 5, `${enemy.cooldown}`, {
+					.text(startX + 5, startY + 5, `${enemy.cooldown}`, {
 						fontSize: '12px',
 						color: '#ffffff'
 					});
@@ -228,9 +238,28 @@ export class GameScene extends Phaser.Scene {
 
 			// 繪製方塊（使用縮放後的大小）
 			const displayCellSize = GRID_CONFIG.cellSize * GRID_CONFIG.optionPieceScale;
+			
+			// 計算方塊的邊界框以進行居中對齊
+			let minX = Infinity;
+			let maxX = -Infinity;
+			let minY = Infinity;
+			let maxY = -Infinity;
+			
 			piece.shape.forEach((offset) => {
-				const cellX = offset.x * displayCellSize;
-				const cellY = offset.y * displayCellSize;
+				minX = Math.min(minX, offset.x);
+				maxX = Math.max(maxX, offset.x);
+				minY = Math.min(minY, offset.y);
+				maxY = Math.max(maxY, offset.y);
+			});
+			
+			// 計算中心偏移量（相對於邊界框中心）
+			const centerOffsetX = (minX + maxX) / 2;
+			const centerOffsetY = (minY + maxY) / 2;
+			
+			piece.shape.forEach((offset) => {
+				// 相對於邊界框中心的座標
+				const cellX = (offset.x - centerOffsetX) * displayCellSize;
+				const cellY = (offset.y - centerOffsetY) * displayCellSize;
 
 				const cell = this.add.graphics();
 				cell.fillStyle(piece.color, 0.8);
@@ -553,7 +582,7 @@ export class GameScene extends Phaser.Scene {
 		EnemySystem.reduceCooldowns(this.gameState.enemies);
 		this.drawEnemies(); // 更新冷卻時間顯示
 
-		// 獲取可以攻擊的敵人
+		// 獲取可以攻擊的敵人（冷卻時間為 0）
 		const readyEnemies = EnemySystem.getReadyEnemies(this.gameState.enemies);
 
 		if (readyEnemies.length > 0) {
@@ -563,6 +592,9 @@ export class GameScene extends Phaser.Scene {
 				// 重置冷卻時間
 				enemy.cooldown = enemy.maxCooldown;
 			}
+
+			// 更新顯示（顯示重置後的冷卻時間）
+			this.drawEnemies();
 
 			// 檢查玩家是否死亡
 			if (this.gameState.playerHp <= 0) {

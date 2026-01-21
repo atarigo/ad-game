@@ -1,8 +1,9 @@
 import { GRID_CONFIG } from '../config';
 import type { TetrisPiece, GridPosition } from '../types';
 
-// 俄羅斯方塊形狀定義
+// 方塊形狀定義（相對於中心點的偏移）
 const TETRIS_SHAPES: Record<string, Array<{ x: number; y: number }>> = {
+	// 基本形狀
 	I: [
 		{ x: -1, y: 0 },
 		{ x: 0, y: 0 },
@@ -44,6 +45,51 @@ const TETRIS_SHAPES: Record<string, Array<{ x: number; y: number }>> = {
 		{ x: 0, y: 0 },
 		{ x: 1, y: 0 },
 		{ x: 1, y: 1 }
+	],
+	// 新增：簡單形狀
+	'1x1': [{ x: 0, y: 0 }],
+	'2x1': [
+		{ x: 0, y: 0 },
+		{ x: 1, y: 0 }
+	],
+	'1x2': [
+		{ x: 0, y: 0 },
+		{ x: 0, y: 1 }
+	],
+	'1x3': [
+		{ x: 0, y: 0 },
+		{ x: 0, y: 1 },
+		{ x: 0, y: 2 }
+	],
+	'3x1': [
+		{ x: -1, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: 1, y: 0 }
+	],
+	// 四種缺角的2x2
+	'2x2_TL': [
+		// 缺左上角
+		{ x: 0, y: 0 },
+		{ x: 1, y: 0 },
+		{ x: 1, y: 1 }
+	],
+	'2x2_TR': [
+		// 缺右上角
+		{ x: -1, y: 0 },
+		{ x: 0, y: 0 },
+		{ x: -1, y: 1 }
+	],
+	'2x2_BL': [
+		// 缺左下角
+		{ x: 0, y: -1 },
+		{ x: 0, y: 0 },
+		{ x: 1, y: 0 }
+	],
+	'2x2_BR': [
+		// 缺右下角
+		{ x: -1, y: -1 },
+		{ x: -1, y: 0 },
+		{ x: 0, y: 0 }
 	]
 };
 
@@ -54,7 +100,16 @@ const TETRIS_COLORS: Record<string, number> = {
 	S: 0x00ff00,
 	Z: 0xff0000,
 	J: 0x0000ff,
-	L: 0xffa500
+	L: 0xffa500,
+	'1x1': 0xffffff,
+	'2x1': 0xff00ff,
+	'1x2': 0x00ff00,
+	'1x3': 0x0000ff,
+	'3x1': 0xffff00,
+	'2x2_TL': 0xff8800,
+	'2x2_TR': 0x88ff00,
+	'2x2_BL': 0x0088ff,
+	'2x2_BR': 0xff0088
 };
 
 export class TetrisSystem {
@@ -62,7 +117,24 @@ export class TetrisSystem {
 	 * 生成隨機方塊
 	 */
 	static generateRandomPiece(): TetrisPiece {
-		const types: Array<keyof typeof TETRIS_SHAPES> = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+		const types: Array<keyof typeof TETRIS_SHAPES> = [
+			'1x1',
+			'2x1',
+			'1x2',
+			'1x3',
+			'3x1',
+			'2x2_TL',
+			'2x2_TR',
+			'2x2_BL',
+			'2x2_BR',
+			'I',
+			'O',
+			'T',
+			'S',
+			'Z',
+			'J',
+			'L'
+		];
 		const type = types[Math.floor(Math.random() * types.length)] as TetrisPiece['type'];
 
 		return {

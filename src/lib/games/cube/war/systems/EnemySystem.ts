@@ -46,10 +46,29 @@ export class EnemySystem {
 		size: 1 | 2 | 3,
 		existingEnemies: Enemy[]
 	): GridPosition | null {
-		const maxAttempts = 50;
+		// 確保 size 不會超出邊界
+		if (size > GRID_CONFIG.enemyRows || size > GRID_CONFIG.enemyCols) {
+			return null;
+		}
+
+		const maxAttempts = 100;
 		for (let attempt = 0; attempt < maxAttempts; attempt++) {
-			const row = Math.floor(Math.random() * (GRID_CONFIG.enemyRows - size + 1));
-			const col = Math.floor(Math.random() * (GRID_CONFIG.enemyCols - size + 1));
+			// 確保計算出的位置不會超出邊界
+			const maxRow = GRID_CONFIG.enemyRows - size;
+			const maxCol = GRID_CONFIG.enemyCols - size;
+			
+			if (maxRow < 0 || maxCol < 0) {
+				return null;
+			}
+
+			const row = Math.floor(Math.random() * (maxRow + 1));
+			const col = Math.floor(Math.random() * (maxCol + 1));
+
+			// 驗證位置是否在範圍內
+			if (row < 0 || row + size > GRID_CONFIG.enemyRows || 
+			    col < 0 || col + size > GRID_CONFIG.enemyCols) {
+				continue;
+			}
 
 			// 檢查是否與現有敵人重疊
 			let isValid = true;
