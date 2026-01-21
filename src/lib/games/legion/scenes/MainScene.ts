@@ -1,83 +1,264 @@
 import type Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../config';
+import { GAME_WIDTH, GAME_HEIGHT, COLORS, GRID, UI, ENEMY_SIZES, calculateStats } from '../config';
+import { World } from '../ecs/Entity';
+import {
+	COMPONENTS,
+	type PositionComponent,
+	type TeamComponent,
+	type StatsComponent,
+	type CombatComponent,
+	type RenderComponent
+} from '../ecs/Components';
+import { GridSystem } from '../systems/GridSystem';
 
 export class MainScene extends Phaser.Scene {
+	private world!: World;
+
 	constructor() {
 		super({ key: 'MainScene' });
 	}
 
 	create() {
-		// 繪製邊界框來顯示遊戲區域
-		const graphics = this.add.graphics();
-		graphics.lineStyle(2, COLORS.border, 1);
-		graphics.strokeRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+		this.world = new World();
 
-		// 添加文字顯示遊戲尺寸
-		this.add
-			.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `遊戲區域\n${GAME_WIDTH} x ${GAME_HEIGHT}`, {
-				fontSize: '24px',
-				color: COLORS.text,
-				align: 'center'
-			})
-			.setOrigin(0.5);
-
-		// 在四個角落畫正立方體
-		const cubeSize = 50;
-		const padding = 10;
-
-		// 左上角
-		this.drawCube(padding, padding, cubeSize);
-
-		// 右上角
-		this.drawCube(GAME_WIDTH - padding - cubeSize, padding, cubeSize);
-
-		// 左下角
-		this.drawCube(padding, GAME_HEIGHT - padding - cubeSize, cubeSize);
-
-		// 右下角
-		this.drawCube(GAME_WIDTH - padding - cubeSize, GAME_HEIGHT - padding - cubeSize, cubeSize);
+		this.drawUI();
+		this.spawnAlly();
+		this.spawnEnemies();
 	}
 
-	drawCube(x: number, y: number, size: number) {
+	private drawUI() {
+		// 繪製敵人棋盤
+		this.drawEnemyGrid();
+
+		// 繪製我方棋盤
+		this.drawAllyGrid();
+
+		// 繪製操作UI
+		this.drawControlUI();
+	}
+
+	private drawEnemyGrid() {
+		const totalWidth = GRID.enemy.cols * GRID.enemy.cellSize + (GRID.enemy.cols - 1) * GRID.enemy.gap;
+		const startX = (GAME_WIDTH - totalWidth) / 2;
+
 		const graphics = this.add.graphics();
 
-		// 等距投影參數
-		const depth = size * 0.6; // 深度
+		for (let row = 0; row < GRID.enemy.rows; row++) {
+			for (let col = 0; col < GRID.enemy.cols; col++) {
+				const x = startX + col * (GRID.enemy.cellSize + GRID.enemy.gap);
+				const y = GRID.enemy.offsetY + row * (GRID.enemy.cellSize + GRID.enemy.gap);
 
-		// 頂面（菱形）
-		graphics.fillStyle(0xff6666, 1);
-		graphics.beginPath();
-		graphics.moveTo(x + size / 2, y); // 上
-		graphics.lineTo(x + size, y + size / 4); // 右
-		graphics.lineTo(x + size / 2, y + size / 2); // 下
-		graphics.lineTo(x, y + size / 4); // 左
-		graphics.closePath();
-		graphics.fill();
-		graphics.lineStyle(2, 0x990000, 1);
-		graphics.strokePath();
+				// 繪製格子背景
+				graphics.fillStyle(COLORS.enemyCell, 1);
+				graphics.fillRect(x, y, GRID.enemy.cellSize, GRID.enemy.cellSize);
 
-		// 左面
-		graphics.fillStyle(0xcc0000, 1);
-		graphics.beginPath();
-		graphics.moveTo(x, y + size / 4); // 頂面左
-		graphics.lineTo(x, y + size / 4 + depth); // 底部左
-		graphics.lineTo(x + size / 2, y + size / 2 + depth); // 底部中
-		graphics.lineTo(x + size / 2, y + size / 2); // 頂面下
-		graphics.closePath();
-		graphics.fill();
-		graphics.lineStyle(2, 0x990000, 1);
-		graphics.strokePath();
+				// 繪製格子邊框
+				graphics.lineStyle(1, COLORS.gridLine, 1);
+				graphics.strokeRect(x, y, GRID.enemy.cellSize, GRID.enemy.cellSize);
+			}
+		}
+	}
 
-		// 右面
-		graphics.fillStyle(0xff0000, 1);
-		graphics.beginPath();
-		graphics.moveTo(x + size, y + size / 4); // 頂面右
-		graphics.lineTo(x + size, y + size / 4 + depth); // 底部右
-		graphics.lineTo(x + size / 2, y + size / 2 + depth); // 底部中
-		graphics.lineTo(x + size / 2, y + size / 2); // 頂面下
-		graphics.closePath();
-		graphics.fill();
-		graphics.lineStyle(2, 0x990000, 1);
-		graphics.strokePath();
+	private drawAllyGrid() {
+		const totalWidth = GRID.ally.cols * GRID.ally.cellSize + (GRID.ally.cols - 1) * GRID.ally.gap;
+		const startX = (GAME_WIDTH - totalWidth) / 2;
+
+		const graphics = this.add.graphics();
+
+		for (let row = 0; row < GRID.ally.rows; row++) {
+			for (let col = 0; col < GRID.ally.cols; col++) {
+				const x = startX + col * (GRID.ally.cellSize + GRID.ally.gap);
+				const y = GRID.ally.offsetY + row * (GRID.ally.cellSize + GRID.ally.gap);
+
+				// 繪製格子背景
+				graphics.fillStyle(COLORS.allyCell, 1);
+				graphics.fillRect(x, y, GRID.ally.cellSize, GRID.ally.cellSize);
+
+				// 繪製格子邊框
+				graphics.lineStyle(1, COLORS.gridLine, 1);
+				graphics.strokeRect(x, y, GRID.ally.cellSize, GRID.ally.cellSize);
+			}
+		}
+	}
+
+	private drawControlUI() {
+		const graphics = this.add.graphics();
+
+		// UI背景
+		graphics.fillStyle(COLORS.uiBackground, 1);
+		graphics.fillRect(0, UI.offsetY, GAME_WIDTH, UI.height);
+
+		// 第一行：道具格（靠左對齊）
+		let itemX = UI.padding;
+		const firstRowY = UI.offsetY + UI.padding;
+
+		for (let i = 0; i < UI.itemSlots.count; i++) {
+			graphics.fillStyle(COLORS.itemSlot, 1);
+			graphics.fillRect(itemX, firstRowY, UI.itemSlots.size, UI.itemSlots.size);
+
+			graphics.lineStyle(2, COLORS.gridLine, 1);
+			graphics.strokeRect(itemX, firstRowY, UI.itemSlots.size, UI.itemSlots.size);
+
+			// 在格子內寫「空」
+			this.add
+				.text(itemX + UI.itemSlots.size / 2, firstRowY + UI.itemSlots.size / 2, '空', {
+					fontSize: '14px',
+					color: COLORS.text
+				})
+				.setOrigin(0.5, 0.5);
+
+			itemX += UI.itemSlots.size + UI.itemSlots.gap;
+		}
+
+		// 第二行：技能格（靠左對齊）
+		let skillX = UI.padding;
+		const secondRowY = firstRowY + UI.itemSlots.size + UI.rowGap;
+
+		for (let i = 0; i < UI.skillSlots.count; i++) {
+			graphics.fillStyle(COLORS.skillSlot, 1);
+			graphics.fillRect(skillX, secondRowY, UI.skillSlots.size, UI.skillSlots.size);
+
+			graphics.lineStyle(2, COLORS.gridLine, 1);
+			graphics.strokeRect(skillX, secondRowY, UI.skillSlots.size, UI.skillSlots.size);
+
+			// 在格子內寫「無」
+			this.add
+				.text(skillX + UI.skillSlots.size / 2, secondRowY + UI.skillSlots.size / 2, '無', {
+					fontSize: '14px',
+					color: COLORS.text
+				})
+				.setOrigin(0.5, 0.5);
+
+			skillX += UI.skillSlots.size + UI.skillSlots.gap;
+		}
+	}
+
+	private spawnAlly() {
+		// 預設在中間位置 (row: 1, col: 2)
+		const row = 1;
+		const col = 2;
+
+		const entity = this.world.createEntity();
+
+		// 位置組件
+		const position: PositionComponent = {
+			row,
+			col,
+			width: 1,
+			height: 1
+		};
+		entity.addComponent(COMPONENTS.POSITION, position);
+
+		// 陣營組件
+		const team: TeamComponent = { isEnemy: false };
+		entity.addComponent(COMPONENTS.TEAM, team);
+
+		// 屬性組件
+		const stats: StatsComponent = {
+			str: 10,
+			vit: 10
+		};
+		entity.addComponent(COMPONENTS.STATS, stats);
+
+		// 戰鬥組件
+		const calculatedStats = calculateStats(stats);
+		const combat: CombatComponent = {
+			currentHp: calculatedStats.hp,
+			maxHp: calculatedStats.hp,
+			atk: calculatedStats.atk,
+			def: calculatedStats.def
+		};
+		entity.addComponent(COMPONENTS.COMBAT, combat);
+
+		// 渲染
+		this.renderCharacter(entity, false);
+	}
+
+	private spawnEnemies() {
+		const enemyCount = Phaser.Math.Between(2, 6);
+		const occupiedCells = GridSystem.createEmptyEnemyGrid();
+
+		for (let i = 0; i < enemyCount; i++) {
+			// 隨機選擇尺寸
+			const sizeType = Phaser.Math.Between(0, ENEMY_SIZES.length - 1);
+			const size = ENEMY_SIZES[sizeType];
+
+			// 嘗試找到有效位置
+			let placed = false;
+			let attempts = 0;
+			const maxAttempts = 50;
+
+			while (!placed && attempts < maxAttempts) {
+				const row = Phaser.Math.Between(0, GRID.enemy.rows - size.height);
+				const col = Phaser.Math.Between(0, GRID.enemy.cols - size.width);
+
+				if (GridSystem.isValidEnemyPosition(row, col, size.width, size.height, occupiedCells)) {
+					this.createEnemy(row, col, size.width, size.height);
+					GridSystem.markOccupied(row, col, size.width, size.height, occupiedCells);
+					placed = true;
+				}
+
+				attempts++;
+			}
+		}
+	}
+
+	private createEnemy(row: number, col: number, width: number, height: number) {
+		const entity = this.world.createEntity();
+
+		// 位置組件
+		const position: PositionComponent = { row, col, width, height };
+		entity.addComponent(COMPONENTS.POSITION, position);
+
+		// 陣營組件
+		const team: TeamComponent = { isEnemy: true };
+		entity.addComponent(COMPONENTS.TEAM, team);
+
+		// 屬性組件（隨機）
+		const stats: StatsComponent = {
+			str: Phaser.Math.Between(5, 15),
+			vit: Phaser.Math.Between(5, 15)
+		};
+		entity.addComponent(COMPONENTS.STATS, stats);
+
+		// 戰鬥組件
+		const calculatedStats = calculateStats(stats);
+		const combat: CombatComponent = {
+			currentHp: calculatedStats.hp,
+			maxHp: calculatedStats.hp,
+			atk: calculatedStats.atk,
+			def: calculatedStats.def
+		};
+		entity.addComponent(COMPONENTS.COMBAT, combat);
+
+		// 渲染
+		this.renderCharacter(entity, true);
+	}
+
+	private renderCharacter(entity: any, isEnemy: boolean) {
+		const position = entity.getComponent<PositionComponent>(COMPONENTS.POSITION);
+		if (!position) return;
+
+		const cellPos = isEnemy
+			? GridSystem.getEnemyCellPosition(position.row, position.col)
+			: GridSystem.getAllyCellPosition(position.row, position.col);
+
+		const cellSize = isEnemy ? GRID.enemy.cellSize : GRID.ally.cellSize;
+		const gap = isEnemy ? GRID.enemy.gap : GRID.ally.gap;
+
+		const width = position.width * cellSize + (position.width - 1) * gap;
+		const height = position.height * cellSize + (position.height - 1) * gap;
+
+		const color = isEnemy ? COLORS.enemy : COLORS.ally;
+
+		const sprite = this.add.rectangle(cellPos.x, cellPos.y, width, height, color);
+		sprite.setOrigin(0, 0);
+		sprite.setStrokeStyle(2, 0xffffff);
+
+		const render: RenderComponent = {
+			color,
+			sprite
+		};
+		entity.addComponent(COMPONENTS.RENDER, render);
 	}
 }
