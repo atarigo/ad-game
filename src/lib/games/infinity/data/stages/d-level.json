@@ -1,0 +1,176 @@
+[
+	{
+		"id": "D-1",
+		"name": "史萊姆初遇",
+		"tier": "D",
+		"waves": [
+			{
+				"id": "D-1-W1",
+				"enemies": [
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 500 }
+			},
+			{
+				"id": "D-1-W2",
+				"enemies": [
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 600 }
+			},
+			{
+				"id": "D-1-W3",
+				"enemies": [
+					{ "monsterId": "slime_green", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "slime_green", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 800 }
+			}
+		]
+	},
+	{
+		"id": "D-2",
+		"name": "哥布林斥候",
+		"tier": "D",
+		"waves": [
+			{
+				"id": "D-2-W1",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 1 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 500 }
+			},
+			{
+				"id": "D-2-W2",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 700 }
+			},
+			{
+				"id": "D-2-W3",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 0 } },
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 2 } },
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 900 }
+			}
+		]
+	},
+	{
+		"id": "D-3",
+		"name": "野狼來襲",
+		"tier": "D",
+		"waves": [
+			{
+				"id": "D-3-W1",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 600 }
+			},
+			{
+				"id": "D-3-W2",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 800 }
+			},
+			{
+				"id": "D-3-W3",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "survive", "rounds": 5 },
+				"reward": { "points": 1000 }
+			}
+		]
+	},
+	{
+		"id": "D-4",
+		"name": "蝙蝠洞穴",
+		"tier": "D",
+		"waves": [
+			{
+				"id": "D-4-W1",
+				"enemies": [
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 500 }
+			},
+			{
+				"id": "D-4-W2",
+				"enemies": [
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 700 }
+			},
+			{
+				"id": "D-4-W3",
+				"enemies": [
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 0 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "bat_cave", "position": { "row": 0, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 900 }
+			}
+		]
+	},
+	{
+		"id": "D-5",
+		"name": "骷髏士兵",
+		"tier": "D",
+		"waves": [
+			{
+				"id": "D-5-W1",
+				"enemies": [
+					{ "monsterId": "skeleton", "position": { "row": 2, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 600 }
+			},
+			{
+				"id": "D-5-W2",
+				"enemies": [
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "skeleton", "position": { "row": 2, "col": 2 } },
+					{ "monsterId": "skeleton", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 900 }
+			},
+			{
+				"id": "D-5-W3",
+				"enemies": [
+					{ "monsterId": "boss_d_slime_king", "position": { "row": 1, "col": 2 }, "instanceId": "boss" }
+				],
+				"winCondition": { "type": "target", "targetId": "boss" },
+				"reward": { "points": 1500 }
+			}
+		]
+	}
+]

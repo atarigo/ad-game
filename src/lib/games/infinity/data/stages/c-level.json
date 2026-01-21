@@ -1,0 +1,58 @@
+[
+	{
+		"id": "C-1",
+		"name": "哥布林營地",
+		"tier": "C",
+		"waves": [
+			{
+				"id": "C-1-W1",
+				"enemies": [
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 800 }
+			},
+			{
+				"id": "C-1-W2",
+				"enemies": [
+					{ "monsterId": "goblin_warrior", "position": { "row": 1, "col": 2 } },
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 1 } },
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1000 }
+			},
+			{
+				"id": "C-1-W3",
+				"enemies": [
+					{ "monsterId": "goblin_warrior", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "goblin_warrior", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "goblin", "position": { "row": 1, "col": 2 } },
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 0 } },
+					{ "monsterId": "goblin", "position": { "row": 2, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1200 }
+			},
+			{
+				"id": "C-1-W4",
+				"enemies": [
+					{ "monsterId": "goblin_shaman", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "goblin_warrior", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "goblin_warrior", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1400 }
+			},
+			{
+				"id": "C-1-W5",
+				"enemies": [
+					{ "monsterId": "boss_c_goblin_chief", "position": { "row": 1, "col": 2 }, "instanceId": "boss" }
+				],
+				"winCondition": { "type": "target", "targetId": "boss" },
+				"reward": { "points": 2500 }
+			}
+		]
+	}
+]

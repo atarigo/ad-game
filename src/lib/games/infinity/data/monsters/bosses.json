@@ -1,0 +1,82 @@
+[
+	{
+		"id": "boss_d_slime_king",
+		"name": "史萊姆王",
+		"color": "0xffd700",
+		"baseAttributes": {
+			"strength": 15,
+			"vitality": 25,
+			"agility": 8,
+			"intelligence": 10,
+			"willpower": 15,
+			"luck": 10
+		},
+		"weapon": "iron_sword",
+		"armor": "leather",
+		"basePointReward": 2000
+	},
+	{
+		"id": "boss_c_goblin_chief",
+		"name": "哥布林大酋長",
+		"color": "0x3a2010",
+		"baseAttributes": {
+			"strength": 20,
+			"vitality": 20,
+			"agility": 15,
+			"intelligence": 12,
+			"willpower": 12,
+			"luck": 12
+		},
+		"weapon": "steel_sword",
+		"armor": "iron_armor",
+		"basePointReward": 3000
+	},
+	{
+		"id": "boss_b_alpha_wolf",
+		"name": "銀狼王",
+		"color": "0xc0c0c0",
+		"baseAttributes": {
+			"strength": 22,
+			"vitality": 18,
+			"agility": 25,
+			"intelligence": 10,
+			"willpower": 15,
+			"luck": 15
+		},
+		"weapon": "steel_sword",
+		"armor": "leather",
+		"basePointReward": 4000
+	},
+	{
+		"id": "boss_a_lich_lord",
+		"name": "巫妖領主",
+		"color": "0x4b0082",
+		"baseAttributes": {
+			"strength": 18,
+			"vitality": 20,
+			"agility": 15,
+			"intelligence": 30,
+			"willpower": 25,
+			"luck": 12
+		},
+		"weapon": "steel_sword",
+		"armor": "iron_armor",
+		"basePointReward": 5000
+	},
+	{
+		"id": "boss_s_demon_lord",
+		"name": "魔王",
+		"color": "0x8b0000",
+		"baseAttributes": {
+			"strength": 30,
+			"vitality": 30,
+			"agility": 20,
+			"intelligence": 25,
+			"willpower": 25,
+			"luck": 20
+		},
+		"weapon": "steel_sword",
+		"armor": "iron_armor",
+		"basePointReward": 8000
+	}
+]

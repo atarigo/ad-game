@@ -1,0 +1,52 @@
+[
+	{
+		"id": "B-1",
+		"name": "狼群領地",
+		"tier": "B",
+		"waves": [
+			{
+				"id": "B-1-W1",
+				"enemies": [
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 3 } },
+					{ "monsterId": "wolf_black", "position": { "row": 2, "col": 2 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1200 }
+			},
+			{
+				"id": "B-1-W2",
+				"enemies": [
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 1 } },
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 3 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 0 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 4 } }
+				],
+				"winCondition": { "type": "annihilation" },
+				"reward": { "points": 1500 }
+			},
+			{
+				"id": "B-1-W3",
+				"enemies": [
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 0 } },
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 2 } },
+					{ "monsterId": "wolf_black", "position": { "row": 0, "col": 4 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 1 } },
+					{ "monsterId": "wolf_grey", "position": { "row": 1, "col": 3 } }
+				],
+				"winCondition": { "type": "survive", "rounds": 8 },
+				"reward": { "points": 2000 }
+			},
+			{
+				"id": "B-1-W4",
+				"enemies": [
+					{ "monsterId": "boss_b_alpha_wolf", "position": { "row": 1, "col": 2 }, "instanceId": "boss" },
+					{ "monsterId": "wolf_black", "position": { "row": 2, "col": 1 } },
+					{ "monsterId": "wolf_black", "position": { "row": 2, "col": 3 } }
+				],
+				"winCondition": { "type": "target", "targetId": "boss" },
+				"reward": { "points": 3500 }
+			}
+		]
+	}
+]
