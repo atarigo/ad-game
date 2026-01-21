@@ -8,6 +8,9 @@
 			<li>
 				<a class="text-sky-600 hover:underline" href="/infinity">Infinity</a>
 			</li>
+			<li>
+				<a href="/playground/mobile">Playground mobile</a>
+			</li>
 		</ul>
 	</div>
 </section>
