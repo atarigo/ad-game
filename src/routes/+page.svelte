@@ -1,0 +1,156 @@
+<script lang="ts">
+	const games: { slug: string; name: string; description: string }[] = [];
+</script>
+
+<svelte:head>
+	<title>Ad Game — 假廣告遊戲集合</title>
+	<meta name="description" content="那些假廣告裡的遊戲，我們真的做出來了。" />
+</svelte:head>
+
+<main>
+	<section class="hero">
+		<h1 class="glitch" data-text="AD GAME">AD GAME</h1>
+		<p class="tagline">那些假廣告裡的遊戲<br />我們真的做出來了。</p>
+	</section>
+
+	<section class="games">
+		{#if games.length === 0}
+			<p class="empty">遊戲開發中，敬請期待。</p>
+		{:else}
+			<ul class="game-list">
+				{#each games as game}
+					<li>
+						<a href="/game/{game.slug}" class="game-card">
+							<span class="game-name">{game.name}</span>
+							<span class="game-desc">{game.description}</span>
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</section>
+</main>
+
+<style>
+	main {
+		min-height: 100vh;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem 1rem;
+		gap: 3rem;
+	}
+
+	/* --- Hero --- */
+
+	.hero {
+		text-align: center;
+	}
+
+	h1 {
+		font-family: 'Audiowide', sans-serif;
+		font-size: clamp(3rem, 10vw, 6rem);
+		letter-spacing: 0.05em;
+		color: var(--neon-pink);
+		text-shadow:
+			0 0 10px var(--neon-pink),
+			0 0 40px rgba(255, 45, 123, 0.4),
+			0 0 80px rgba(255, 45, 123, 0.2);
+		position: relative;
+	}
+
+	/* glitch layers */
+	.glitch::before,
+	.glitch::after {
+		content: attr(data-text);
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+	}
+
+	.glitch::before {
+		color: var(--neon-cyan);
+		animation: glitch-1 3s infinite linear;
+		clip-path: inset(0 0 80% 0);
+	}
+
+	.glitch::after {
+		color: var(--neon-yellow);
+		animation: glitch-2 3s infinite linear;
+		clip-path: inset(80% 0 0 0);
+	}
+
+	@keyframes glitch-1 {
+		0%, 90%, 100% { transform: none; }
+		92% { transform: translate(-4px, -2px); }
+		94% { transform: translate(4px, 2px); }
+		96% { transform: translate(-2px, 1px); }
+	}
+
+	@keyframes glitch-2 {
+		0%, 88%, 100% { transform: none; }
+		90% { transform: translate(3px, -1px); }
+		93% { transform: translate(-3px, 2px); }
+		95% { transform: translate(2px, -2px); }
+	}
+
+	.tagline {
+		margin-top: 1rem;
+		font-size: clamp(1rem, 3vw, 1.4rem);
+		color: var(--text-muted);
+		line-height: 1.8;
+		letter-spacing: 0.1em;
+	}
+
+	/* --- Games --- */
+
+	.games {
+		width: 100%;
+		max-width: 480px;
+	}
+
+	.empty {
+		text-align: center;
+		color: var(--text-muted);
+		font-size: 0.95rem;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 8px;
+		padding: 2rem;
+	}
+
+	.game-list {
+		list-style: none;
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.game-card {
+		display: block;
+		padding: 1.2rem 1.5rem;
+		border: 1px solid rgba(0, 240, 255, 0.25);
+		border-radius: 8px;
+		background: rgba(0, 240, 255, 0.04);
+		transition: border-color 0.2s, box-shadow 0.2s;
+	}
+
+	.game-card:hover {
+		border-color: var(--neon-cyan);
+		box-shadow: 0 0 16px rgba(0, 240, 255, 0.15);
+	}
+
+	.game-name {
+		display: block;
+		font-family: 'Audiowide', sans-serif;
+		font-size: 1.1rem;
+		color: var(--neon-cyan);
+	}
+
+	.game-desc {
+		display: block;
+		margin-top: 0.3rem;
+		font-size: 0.85rem;
+		color: var(--text-muted);
+	}
+</style>
