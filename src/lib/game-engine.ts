@@ -24,7 +24,15 @@ export const COLORS = {
 
 export async function initApp(el: HTMLElement, bg = COLORS.bg) {
 	const app = new Application();
-	await app.init({ width: W, height: H, background: bg, antialias: true });
+	const dpr = window.devicePixelRatio || 1;
+	await app.init({
+		width: W,
+		height: H,
+		background: bg,
+		antialias: true,
+		resolution: dpr,
+		autoDensity: true,
+	});
 	el.appendChild(app.canvas);
 
 	const fit = () => {

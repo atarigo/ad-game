@@ -101,5 +101,6 @@
 	.canvas-wrap :global(canvas) {
 		display: block;
 		border-radius: 4px;
+		image-rendering: -webkit-optimize-contrast;
 	}
 </style>
