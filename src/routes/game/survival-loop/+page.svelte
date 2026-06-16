@@ -134,7 +134,9 @@
 		const mStockT = centeredText('', MSTN.x, MSTN.y - 28, { size: 11, color: COLORS.yellow, family: 'Arial' });
 		const wLvT = centeredText('Lv1', WSTN.x, WSTN.y - 40, { size: 10, color: COLORS.cyan, family: 'Arial' });
 		const mLvT = centeredText('Lv1', MSTN.x, MSTN.y - 40, { size: 10, color: COLORS.cyan, family: 'Arial' });
-		zoneLayer.addChild(wStockT, mStockT, wLvT, mLvT);
+		const bStockT = centeredText('', BENTO.x - 20, BENTO.y - 38, { size: 11, color: COLORS.yellow, family: 'Arial' });
+		const bCoinT = centeredText('', BENTO.x + 20, BENTO.y - 38, { size: 11, color: COLORS.gold, family: 'Arial' });
+		zoneLayer.addChild(wStockT, mStockT, wLvT, mLvT, bStockT, bCoinT);
 
 		// --- Snow ---
 		interface Flake { g: Graphics; x: number; y: number; s: number; d: number }
@@ -155,7 +157,7 @@
 		clickArea.cursor = 'pointer';
 
 		// --- Game State ---
-		type IType = 'wood' | 'meat' | 'bento';
+		type IType = 'wood' | 'meat' | 'coin';
 		interface Drop { type: IType | 'coin'; x: number; y: number; gfx: Graphics; vy: number; bounceY: number; landed: boolean; flying: boolean }
 		interface Tree { c: Container; x: number; y: number; hp: number; max: number; bar: Graphics }
 		interface Beast { c: Container; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number }
@@ -165,24 +167,33 @@
 		const beasts: Beast[] = [];
 
 		let coins = 0;
-		let wStock = 0, wLv = 1, wWorker = false, wProdT = 0;
-		let mStock = 0, mLv = 1, mWorker = false, mProdT = 0;
-		let hasCutter = false, hasHunter2 = false;
-		let cutterT = 0, hunterT2 = 0;
+		let wStock = 0, wLv = 1, wProdT = 0;
+		let mStock = 0, mLv = 1, mProdT = 0;
+		let bentoStock = 0, bentoProdT = 0;
 
-		// Score & timer
 		const GAME_TIME = 180000;
 		let timer = GAME_TIME;
 		let score = 0;
 		let statTrees = 0, statBeasts = 0, statCoins = 0;
 
-		// Movable field workers
-		interface FieldWorker { c: Container; x: number; y: number; tgt: Tree | Beast | null; atkT: number; face: number; walkT: number }
-		let cutterW: FieldWorker | null = null;
-		let hunterW: FieldWorker | null = null;
+		// Unified worker system
+		type HState = 'working' | 'toEat' | 'eating' | 'returning';
+		interface Wk {
+			c: Container; x: number; y: number;
+			homeX: number; homeY: number;
+			face: number; walkT: number;
+			workCount: number; hunger: HState;
+			tgt: Tree | Beast | null; atkT: number;
+		}
+		const allWk: Wk[] = [];
+		let wStnWk: Wk | null = null;
+		let mStnWk: Wk | null = null;
+		let cutterWk: Wk | null = null;
+		let hunterWk: Wk | null = null;
+		let bentoWk: Wk | null = null;
 
 		function ucost(lv: number) { return Math.floor(8 * Math.pow(1.6, lv - 1)); }
-		function prodMs(lv: number) { return 1500 / (1 + (lv - 1) * 0.35); }
+		function prodMs(lv: number) { return 1000 / (1 + (lv - 1) * 0.35); }
 
 		// --- Player ---
 		const P = {
@@ -215,20 +226,31 @@
 		const pEye = new Graphics(); pEye.circle(3, -20, 2).fill(0x222222);
 		pBody.addChild(pEye);
 
-		const pCarryT = centeredText('', 0, -32, { size: 11, color: COLORS.yellow, family: 'Arial' });
-		pC.addChild(pCarryT);
+		const pCarryC = new Container();
+		pC.addChild(pCarryC);
 		pC.x = P.x;
 		pC.y = P.y;
 		charLayer.addChild(pC);
 
-		function carryText(): string {
-			const c: Record<string, number> = {};
-			for (const i of P.carry) c[i] = (c[i] || 0) + 1;
-			const p: string[] = [];
-			if (c.wood) p.push('🪵' + c.wood);
-			if (c.meat) p.push('🥩' + c.meat);
-			if (c.bento) p.push('🍱' + c.bento);
-			return p.join(' ');
+		function updateCarryVisual() {
+			pCarryC.removeChildren();
+			let wc = 0, mc = 0, cc = 0;
+			for (let i = 0; i < P.carry.length; i++) {
+				if (P.carry[i] === 'wood') wc++;
+				else if (P.carry[i] === 'meat') mc++;
+				else cc++;
+			}
+			const parts: string[] = [];
+			if (wc > 0) parts.push('🪵' + wc);
+			if (mc > 0) parts.push('🥩' + mc);
+			if (cc > 0) parts.push('💰' + cc);
+			if (parts.length === 0) return;
+			const spacing = 32;
+			const totalW = parts.length * spacing;
+			for (let i = 0; i < parts.length; i++) {
+				const t = centeredText(parts[i], -totalW / 2 + spacing / 2 + i * spacing, -34, { size: 10, color: COLORS.yellow, family: 'Arial' });
+				pCarryC.addChild(t);
+			}
 		}
 
 		// --- Helpers ---
@@ -384,25 +406,20 @@
 		}
 
 		// --- Workers ---
-		function addWorker(x: number, y: number, col: number): Container {
+		function spawnWk(x: number, y: number, col: number): Wk {
 			const c = new Container();
-			c.x = x;
-			c.y = y;
-			c.zIndex = y;
+			c.x = x; c.y = y; c.zIndex = y;
 			const sh = new Graphics(); sh.ellipse(0, 2, 7, 3).fill({ color: 0x000000, alpha: 0.2 }); c.addChild(sh);
-			const b = new Graphics(); b.rect(-4, -4, 8, 12).fill(col); c.addChild(b);
-			const h = new Graphics(); h.circle(0, -10, 5).fill(0xdda070); c.addChild(h);
+			const body = new Graphics(); body.rect(-4, -4, 8, 12).fill(col); c.addChild(body);
+			const head = new Graphics(); head.circle(0, -10, 5).fill(0xdda070); c.addChild(head);
 			charLayer.addChild(c);
-			return c;
-		}
-
-		function makeFieldWorker(x: number, y: number, col: number): FieldWorker {
-			const c = addWorker(x, y, col);
-			return { c, x, y, tgt: null, atkT: 0, face: 1, walkT: 0 };
+			const wk: Wk = { c, x, y, homeX: x, homeY: y, face: 1, walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0 };
+			allWk.push(wk);
+			return wk;
 		}
 
 		// --- UI Buttons ---
-		type BtnDef = { update: () => void };
+		type BtnDef = { update: () => void; trigger: () => void; isVis: () => boolean; isOn: () => boolean };
 		const btns: BtnDef[] = [];
 
 		function mkBtn(
@@ -421,20 +438,27 @@
 				.roundRect(-70, -15, 140, 30, 6)
 				.stroke({ color: COLORS.cyan, width: 1, alpha: 0.5 });
 			c.addChild(bg);
-			const lbl = centeredText(getText(), 0, 0, { size: 11, color: COLORS.white, family: 'Arial' });
+			const idx = btns.length + 1;
+			const keyLabel = centeredText(String(idx), -58, 0, { size: 9, color: COLORS.muted, family: 'Arial' });
+			c.addChild(keyLabel);
+			const lbl = centeredText(getText(), 4, 0, { size: 11, color: COLORS.white, family: 'Arial' });
 			c.addChild(lbl);
 			c.eventMode = 'static';
 			c.cursor = 'pointer';
 			c.visible = false;
-			c.on('pointerdown', function () {
+			function doTrigger() {
 				if (isOn()) { onClick(); refreshUI(); }
-			});
+			}
+			c.on('pointerdown', doTrigger);
 			hudLayer.addChild(c);
 			const def: BtnDef = {
+				isVis,
+				isOn,
+				trigger: doTrigger,
 				update: function () {
 					const v = isVis();
 					c.visible = v;
-					if (v) { lbl.text = getText(); c.alpha = isOn() ? 1 : 0.35; }
+					if (v) { lbl.text = getText(); c.alpha = isOn() ? 1 : 0.6; }
 				}
 			};
 			btns.push(def);
@@ -444,67 +468,63 @@
 		function pNearW() { return dist(P.x, P.y, WSTN.x, WSTN.y) < DR; }
 		function pNearM() { return dist(P.x, P.y, MSTN.x, MSTN.y) < DR; }
 		function pNearB() { return dist(P.x, P.y, BENTO.x, BENTO.y) < DR; }
-		function pInFor() { return dist(P.x, P.y, FOREST.x, FOREST.y) < FOREST.r + 20; }
-		function pInHunt() { return dist(P.x, P.y, HUNT.x, HUNT.y) < HUNT.r + 20; }
-		function pHasBento() { return P.carry.includes('bento'); }
-		function useBento() {
-			const i = P.carry.indexOf('bento');
-			if (i >= 0) P.carry.splice(i, 1);
-		}
+		function hasBentoStock() { return bentoStock > 0; }
+		function useBentoStock() { if (bentoStock > 0) bentoStock--; }
+		function carryCoins() { let n = 0; for (let i = 0; i < P.carry.length; i++) if (P.carry[i] === 'coin') n++; return n; }
+		function spendCoins(amount: number) { for (let i = 0; i < amount; i++) { const ci = P.carry.indexOf('coin'); if (ci >= 0) P.carry.splice(ci, 1); } }
 
+		// Wood station buttons
 		mkBtn(
-			function () { return '買便當 💰3'; },
-			function () { return pNearB(); },
-			function () { return coins >= 3 && P.carry.length < CAP; },
-			function () { coins -= 3; P.carry.push('bento'); popup('+🍱', P.x, P.y - 30, COLORS.white); },
+			function () { return '雇用店員 🍱1'; },
+			function () { return pNearW() && !wStnWk; },
+			function () { return hasBentoStock(); },
+			function () { useBentoStock(); wStnWk = spawnWk(WSTN.x + 25, WSTN.y, 0x6a8a4a); wStnWk.homeX = WSTN.x + 25; wStnWk.homeY = WSTN.y; popup('+👷', WSTN.x, WSTN.y - 30, COLORS.green); },
 			H - 55
 		);
-
+		mkBtn(
+			function () { return '雇用樵夫 🍱1'; },
+			function () { return pNearW() && !cutterWk; },
+			function () { return hasBentoStock(); },
+			function () { useBentoStock(); cutterWk = spawnWk(FOREST.x, FOREST.y + 30, 0x4a8a4a); cutterWk.homeX = FOREST.x; cutterWk.homeY = FOREST.y + 30; popup('+🪓', WSTN.x, WSTN.y - 30, COLORS.green); },
+			H - 95
+		);
 		mkBtn(
 			function () { return wLv >= MAX_LV ? '木材站 MAX' : '⬆木材站Lv' + (wLv + 1) + ' 💰' + ucost(wLv); },
 			function () { return pNearW() && wLv < MAX_LV; },
-			function () { return coins >= ucost(wLv); },
-			function () { coins -= ucost(wLv); wLv++; popup('⬆Lv' + wLv, WSTN.x, WSTN.y - 40, COLORS.cyan); },
-			H - 95
+			function () { return carryCoins() >= ucost(wLv); },
+			function () { spendCoins(ucost(wLv)); wLv++; popup('⬆Lv' + wLv, WSTN.x, WSTN.y - 40, COLORS.cyan); },
+			H - 135
 		);
 
+		// Meat station buttons
+		mkBtn(
+			function () { return '雇用店員 🍱1'; },
+			function () { return pNearM() && !mStnWk; },
+			function () { return hasBentoStock(); },
+			function () { useBentoStock(); mStnWk = spawnWk(MSTN.x + 25, MSTN.y, 0x8a4a6a); mStnWk.homeX = MSTN.x + 25; mStnWk.homeY = MSTN.y; popup('+👷', MSTN.x, MSTN.y - 30, COLORS.green); },
+			H - 55
+		);
+		mkBtn(
+			function () { return '雇用獵人 🍱1'; },
+			function () { return pNearM() && !hunterWk; },
+			function () { return hasBentoStock(); },
+			function () { useBentoStock(); hunterWk = spawnWk(HUNT.x, HUNT.y + 30, 0x8a6a4a); hunterWk.homeX = HUNT.x; hunterWk.homeY = HUNT.y + 30; popup('+🏹', MSTN.x, MSTN.y - 30, COLORS.green); },
+			H - 95
+		);
 		mkBtn(
 			function () { return mLv >= MAX_LV ? '肉品站 MAX' : '⬆肉品站Lv' + (mLv + 1) + ' 💰' + ucost(mLv); },
 			function () { return pNearM() && mLv < MAX_LV; },
-			function () { return coins >= ucost(mLv); },
-			function () { coins -= ucost(mLv); mLv++; popup('⬆Lv' + mLv, MSTN.x, MSTN.y - 40, COLORS.cyan); },
-			H - 95
+			function () { return carryCoins() >= ucost(mLv); },
+			function () { spendCoins(ucost(mLv)); mLv++; popup('⬆Lv' + mLv, MSTN.x, MSTN.y - 40, COLORS.cyan); },
+			H - 135
 		);
 
+		// Bento shop button
 		mkBtn(
-			function () { return '雇用站工人 🍱1'; },
-			function () { return pNearW() && !wWorker; },
-			function () { return pHasBento(); },
-			function () { useBento(); wWorker = true; addWorker(WSTN.x + 25, WSTN.y, 0x6a8a4a); popup('+👷', WSTN.x, WSTN.y - 30, COLORS.green); },
-			H - 55
-		);
-
-		mkBtn(
-			function () { return '雇用站工人 🍱1'; },
-			function () { return pNearM() && !mWorker; },
-			function () { return pHasBento(); },
-			function () { useBento(); mWorker = true; addWorker(MSTN.x + 25, MSTN.y, 0x8a4a6a); popup('+👷', MSTN.x, MSTN.y - 30, COLORS.green); },
-			H - 55
-		);
-
-		mkBtn(
-			function () { return '雇用砍柴工 🍱1'; },
-			function () { return pInFor() && !hasCutter; },
-			function () { return pHasBento(); },
-			function () { useBento(); hasCutter = true; cutterW = makeFieldWorker(FOREST.x, FOREST.y + 30, 0x4a8a4a); popup('+🪓', FOREST.x, FOREST.y - 20, COLORS.green); },
-			H - 55
-		);
-
-		mkBtn(
-			function () { return '雇用獵人 🍱1'; },
-			function () { return pInHunt() && !hasHunter2; },
-			function () { return pHasBento(); },
-			function () { useBento(); hasHunter2 = true; hunterW = makeFieldWorker(HUNT.x, HUNT.y + 30, 0x8a6a4a); popup('+🏹', HUNT.x, HUNT.y - 20, COLORS.green); },
+			function () { return '雇用店員 🍱1'; },
+			function () { return pNearB() && !bentoWk; },
+			function () { return hasBentoStock(); },
+			function () { useBentoStock(); bentoWk = spawnWk(BENTO.x + 25, BENTO.y, 0x8a7a4a); bentoWk.homeX = BENTO.x + 25; bentoWk.homeY = BENTO.y; popup('+👷', BENTO.x, BENTO.y - 30, COLORS.green); },
 			H - 55
 		);
 
@@ -517,8 +537,6 @@
 		hudLayer.addChild(hudBg);
 		const timerHud = centeredText('3:00', 55, 18, { size: 14, color: COLORS.white, family: 'Arial' });
 		hudLayer.addChild(timerHud);
-		const coinHud = centeredText('💰 0', W / 2, 18, { size: 14, color: COLORS.gold, family: 'Arial' });
-		hudLayer.addChild(coinHud);
 		const scoreHud = centeredText('🏆 0', W - 55, 18, { size: 14, color: COLORS.cyan, family: 'Arial' });
 		hudLayer.addChild(scoreHud);
 
@@ -528,19 +546,28 @@
 			const s = sec % 60;
 			timerHud.text = m + ':' + (s < 10 ? '0' : '') + s;
 			if (sec <= 10) timerHud.style.fill = COLORS.red;
-			coinHud.text = '💰 ' + coins;
 			scoreHud.text = '🏆 ' + score;
 			wStockT.text = wStock > 0 ? '🪵' + wStock : '';
 			mStockT.text = mStock > 0 ? '🥩' + mStock : '';
+			bStockT.text = bentoStock > 0 ? '🍱' + bentoStock : '';
+			bCoinT.text = coins > 0 ? '💰' + coins : '';
 			wLvT.text = 'Lv' + wLv;
 			mLvT.text = 'Lv' + mLv;
-			pCarryT.text = carryText();
+			updateCarryVisual();
 			for (let i = 0; i < allBtns.length; i++) allBtns[i].update();
 		}
 
 		// --- Keyboard ---
 		const keys: Record<string, boolean> = {};
-		function onKeyDown(e: KeyboardEvent) { keys[e.key] = true; }
+		function onKeyDown(e: KeyboardEvent) {
+			keys[e.key] = true;
+			if (state !== 'playing') return;
+			if (e.key >= '1' && e.key <= '9') {
+				const idx = parseInt(e.key) - 1;
+				const visible = btns.filter(function (b) { return b.isVis(); });
+				if (idx < visible.length) visible[idx].trigger();
+			}
+		}
 		function onKeyUp(e: KeyboardEvent) { keys[e.key] = false; }
 		window.addEventListener('keydown', onKeyDown);
 		window.addEventListener('keyup', onKeyUp);
@@ -820,17 +847,13 @@
 					const dd = drops[i];
 					if (dd.flying || !dd.landed) continue;
 					if (dist(dd.x, dd.y, P.x, P.y) > PR) continue;
-					if (dd.type === 'coin') {
-						pickupCD = 80;
-						flyTo(dd, P.x, P.y - 15, function () { coins++; rmDrop(dd); refreshUI(); });
-						break;
-					} else {
-						if (P.carry.length >= CAP) continue;
-						pickupCD = 100;
-						const tp = dd.type as IType;
-						flyTo(dd, P.x, P.y - 15, function () { P.carry.push(tp); rmDrop(dd); refreshUI(); });
-						break;
-					}
+					const typeCount = P.carry.filter(function (c) { return c === dd.type; }).length;
+					const typeCap = dd.type === 'coin' ? 50 : CAP;
+					if (typeCount >= typeCap) continue;
+					pickupCD = 80;
+					const tp = dd.type as IType;
+					flyTo(dd, P.x, P.y - 15, function () { P.carry.push(tp); rmDrop(dd); refreshUI(); });
+					break;
 				}
 			}
 
@@ -861,32 +884,72 @@
 						flyTo(tmp, MSTN.x, MSTN.y, function () { mStock++; g.destroy(); refreshUI(); });
 					}
 				}
+				if (dist(P.x, P.y, BENTO.x, BENTO.y) < DR) {
+					const ci = P.carry.indexOf('coin');
+					if (ci >= 0) {
+						depositCD = 150;
+						P.carry.splice(ci, 1);
+						const g = mkGfx('coin');
+						g.x = P.x; g.y = P.y - 10;
+						itemLayer.addChild(g);
+						const tmp: Drop = { type: 'coin', x: P.x, y: P.y - 10, gfx: g, vy: 0, bounceY: P.y, landed: true, flying: false };
+						flyTo(tmp, BENTO.x, BENTO.y, function () { coins++; g.destroy(); refreshUI(); });
+					}
+				}
 			}
 
-			// Station production (requires worker OR player nearby)
-			const wManned = wWorker || dist(P.x, P.y, WSTN.x, WSTN.y) < DR;
-			if (wStock > 0 && wManned) {
+			// Station production (requires worker working OR player nearby)
+			const wStnActive = (wStnWk && wStnWk.hunger === 'working') || dist(P.x, P.y, WSTN.x, WSTN.y) < DR;
+			if (wStock > 0 && wStnActive) {
 				wProdT += dt;
 				if (wProdT >= prodMs(wLv)) {
 					wProdT = 0;
 					wStock--;
 					statCoins++; score += 10;
 					spawnDrop('coin', WSTN.x + 15, WSTN.y + 10);
+					if (wStnWk && wStnWk.hunger === 'working') {
+						wStnWk.workCount++;
+						if (wStnWk.workCount >= 5) wStnWk.hunger = 'toEat';
+					}
 					refreshUI();
 				}
 			} else { wProdT = 0; }
 
-			const mManned = mWorker || dist(P.x, P.y, MSTN.x, MSTN.y) < DR;
-			if (mStock > 0 && mManned) {
+			const mStnActive = (mStnWk && mStnWk.hunger === 'working') || dist(P.x, P.y, MSTN.x, MSTN.y) < DR;
+			if (mStock > 0 && mStnActive) {
 				mProdT += dt;
 				if (mProdT >= prodMs(mLv)) {
 					mProdT = 0;
 					mStock--;
 					statCoins++; score += 10;
 					spawnDrop('coin', MSTN.x + 15, MSTN.y + 10);
+					if (mStnWk && mStnWk.hunger === 'working') {
+						mStnWk.workCount++;
+						if (mStnWk.workCount >= 5) mStnWk.hunger = 'toEat';
+					}
 					refreshUI();
 				}
 			} else { mProdT = 0; }
+
+			// Bento production (player or bento worker at shop → coins to bento)
+			const bentoActive = (bentoWk && bentoWk.hunger === 'working') || dist(P.x, P.y, BENTO.x, BENTO.y) < DR;
+			if (bentoActive && coins > 0) {
+				bentoProdT += dt;
+				if (bentoProdT >= 1200) {
+					bentoProdT = 0;
+					coins--;
+					bentoStock++;
+					popup('+🍱', BENTO.x, BENTO.y - 30, COLORS.white);
+					if (bentoWk && bentoWk.hunger === 'working') {
+						bentoWk.workCount++;
+						if (bentoWk.workCount >= 5) {
+							if (bentoStock > 0) { bentoStock--; bentoWk.workCount = 0; }
+							else { bentoWk.hunger = 'eating'; }
+						}
+					}
+					refreshUI();
+				}
+			} else { bentoProdT = 0; }
 
 			// Animals wander (2D)
 			for (let i = 0; i < beasts.length; i++) {
@@ -900,16 +963,10 @@
 				a.x += a.vx;
 				a.y += a.vy2;
 				if (dist(a.x, a.y, HUNT.x, HUNT.y) > HUNT.r - 10) {
-					a.vx *= -1;
-					a.vy2 *= -1;
-					a.x += a.vx * 2;
-					a.y += a.vy2 * 2;
+					a.vx *= -1; a.vy2 *= -1;
+					a.x += a.vx * 2; a.y += a.vy2 * 2;
 				}
-				if (!a.c.destroyed) {
-					a.c.x = a.x;
-					a.c.y = a.y;
-					a.c.zIndex = a.y;
-				}
+				if (!a.c.destroyed) { a.c.x = a.x; a.c.y = a.y; a.c.zIndex = a.y; }
 			}
 
 			// Spawn
@@ -918,66 +975,105 @@
 			beastSpT += dt;
 			if (beastSpT > 3000 && beasts.length < 3) { beastSpT = 0; spawnBeast(); }
 
-			// Field worker AI (cutter)
-			if (cutterW) {
-				const fw = cutterW;
-				if (fw.tgt && fw.tgt.c.destroyed) fw.tgt = null;
-				if (!fw.tgt && trees.length > 0) {
-					let best: Tree | null = null, bd = Infinity;
-					for (let i = 0; i < trees.length; i++) {
-						const d2 = dist(fw.x, fw.y, trees[i].x, trees[i].y);
-						if (d2 < bd) { bd = d2; best = trees[i]; }
-					}
-					fw.tgt = best;
-				}
-				if (fw.tgt) {
-					const d2 = dist(fw.x, fw.y, fw.tgt.x, fw.tgt.y);
-					if (d2 > 25) {
-						const ddx = fw.tgt.x - fw.x, ddy = fw.tgt.y - fw.y;
-						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-						fw.x += (ddx / dd) * 2;
-						fw.y += (ddy / dd) * 2;
-						if (Math.abs(ddx) > 0.5) fw.face = ddx > 0 ? 1 : -1;
-						fw.walkT++;
-					} else {
-						fw.walkT = 0;
-						fw.atkT -= dt;
-						if (fw.atkT <= 0) { fw.atkT = ACD; hitTree(fw.tgt); }
-					}
-				}
-				fw.c.x = fw.x; fw.c.y = fw.y; fw.c.zIndex = fw.y;
-				fw.c.scale.x = fw.face;
-			}
+			// --- Unified worker AI ---
+			for (let wi = 0; wi < allWk.length; wi++) {
+				const wk = allWk[wi];
 
-			// Field worker AI (hunter)
-			if (hunterW) {
-				const fw = hunterW;
-				if (fw.tgt && (fw.tgt as Beast).c.destroyed) fw.tgt = null;
-				if (!fw.tgt && beasts.length > 0) {
-					let best: Beast | null = null, bd = Infinity;
-					for (let i = 0; i < beasts.length; i++) {
-						const d2 = dist(fw.x, fw.y, beasts[i].x, beasts[i].y);
-						if (d2 < bd) { bd = d2; best = beasts[i]; }
-					}
-					fw.tgt = best;
-				}
-				if (fw.tgt) {
-					const d2 = dist(fw.x, fw.y, fw.tgt.x, fw.tgt.y);
-					if (d2 > 25) {
-						const ddx = fw.tgt.x - fw.x, ddy = fw.tgt.y - fw.y;
+				if (wk.hunger === 'toEat') {
+					const d2 = dist(wk.x, wk.y, BENTO.x, BENTO.y + 15);
+					if (d2 > 8) {
+						const ddx = BENTO.x - wk.x, ddy = (BENTO.y + 15) - wk.y;
 						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-						fw.x += (ddx / dd) * 2;
-						fw.y += (ddy / dd) * 2;
-						if (Math.abs(ddx) > 0.5) fw.face = ddx > 0 ? 1 : -1;
-						fw.walkT++;
-					} else {
-						fw.walkT = 0;
-						fw.atkT -= dt;
-						if (fw.atkT <= 0) { fw.atkT = ACD; hitBeast(fw.tgt as Beast); }
+						wk.x += (ddx / dd) * 2.5; wk.y += (ddy / dd) * 2.5;
+						if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+						wk.walkT++;
+					} else { wk.hunger = 'eating'; wk.walkT = 0; }
+
+				} else if (wk.hunger === 'eating') {
+					if (bentoStock > 0) { bentoStock--; wk.workCount = 0; wk.hunger = 'returning'; refreshUI(); }
+
+				} else if (wk.hunger === 'returning') {
+					const d2 = dist(wk.x, wk.y, wk.homeX, wk.homeY);
+					if (d2 > 8) {
+						const ddx = wk.homeX - wk.x, ddy = wk.homeY - wk.y;
+						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+						wk.x += (ddx / dd) * 2.5; wk.y += (ddy / dd) * 2.5;
+						if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+						wk.walkT++;
+					} else { wk.hunger = 'working'; wk.walkT = 0; }
+
+				} else if (wk.hunger === 'working') {
+					// Cutter AI
+					if (wk === cutterWk) {
+						if (wk.tgt && wk.tgt.c.destroyed) wk.tgt = null;
+						if (!wk.tgt && trees.length > 0) {
+							let best: Tree | null = null, bd = Infinity;
+							for (let j = 0; j < trees.length; j++) {
+								const d2 = dist(wk.x, wk.y, trees[j].x, trees[j].y);
+								if (d2 < bd) { bd = d2; best = trees[j]; }
+							}
+							wk.tgt = best;
+						}
+						if (wk.tgt) {
+							const d2 = dist(wk.x, wk.y, wk.tgt.x, wk.tgt.y);
+							if (d2 > 25) {
+								const ddx = wk.tgt.x - wk.x, ddy = wk.tgt.y - wk.y;
+								const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+								wk.x += (ddx / dd) * 2; wk.y += (ddy / dd) * 2;
+								if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+								wk.walkT++;
+							} else {
+								wk.walkT = 0; wk.atkT -= dt;
+								if (wk.atkT <= 0) {
+									wk.atkT = ACD;
+									const before = trees.length;
+									hitTree(wk.tgt as Tree);
+									if (trees.length < before) {
+										wk.tgt = null; wk.workCount++;
+										if (wk.workCount >= 5) wk.hunger = 'toEat';
+									}
+								}
+							}
+						}
+					}
+
+					// Hunter AI
+					if (wk === hunterWk) {
+						if (wk.tgt && (wk.tgt as Beast).c.destroyed) wk.tgt = null;
+						if (!wk.tgt && beasts.length > 0) {
+							let best: Beast | null = null, bd = Infinity;
+							for (let j = 0; j < beasts.length; j++) {
+								const d2 = dist(wk.x, wk.y, beasts[j].x, beasts[j].y);
+								if (d2 < bd) { bd = d2; best = beasts[j]; }
+							}
+							wk.tgt = best;
+						}
+						if (wk.tgt) {
+							const d2 = dist(wk.x, wk.y, wk.tgt.x, wk.tgt.y);
+							if (d2 > 25) {
+								const ddx = wk.tgt.x - wk.x, ddy = wk.tgt.y - wk.y;
+								const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+								wk.x += (ddx / dd) * 2; wk.y += (ddy / dd) * 2;
+								if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+								wk.walkT++;
+							} else {
+								wk.walkT = 0; wk.atkT -= dt;
+								if (wk.atkT <= 0) {
+									wk.atkT = ACD;
+									const before = beasts.length;
+									hitBeast(wk.tgt as Beast);
+									if (beasts.length < before) {
+										wk.tgt = null; wk.workCount++;
+										if (wk.workCount >= 5) wk.hunger = 'toEat';
+									}
+								}
+							}
+						}
 					}
 				}
-				fw.c.x = fw.x; fw.c.y = fw.y; fw.c.zIndex = fw.y;
-				fw.c.scale.x = fw.face;
+
+				wk.c.x = wk.x; wk.c.y = wk.y; wk.c.zIndex = wk.y;
+				wk.c.scale.x = wk.face;
 			}
 
 			refreshUI();
