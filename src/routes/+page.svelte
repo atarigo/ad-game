@@ -42,6 +42,7 @@
 			</ul>
 		{/if}
 	</section>
+	<span class="version">v0.1.0</span>
 </main>
 
 <style>
@@ -67,9 +68,8 @@
 		letter-spacing: 0.05em;
 		color: var(--neon-pink);
 		text-shadow:
-			0 0 10px var(--neon-pink),
-			0 0 40px rgba(255, 45, 123, 0.4),
-			0 0 80px rgba(255, 45, 123, 0.2);
+			0 0 6px var(--neon-pink),
+			0 0 20px rgba(255, 45, 123, 0.3);
 		position: relative;
 	}
 
@@ -80,18 +80,19 @@
 		position: absolute;
 		inset: 0;
 		pointer-events: none;
+		opacity: 0.6;
 	}
 
 	.glitch::before {
 		color: var(--neon-cyan);
 		animation: glitch-1 3s infinite linear;
-		clip-path: inset(0 0 80% 0);
+		clip-path: inset(0 0 85% 0);
 	}
 
 	.glitch::after {
 		color: var(--neon-yellow);
 		animation: glitch-2 3s infinite linear;
-		clip-path: inset(80% 0 0 0);
+		clip-path: inset(85% 0 0 0);
 	}
 
 	@keyframes glitch-1 {
@@ -171,5 +172,13 @@
 		margin-top: 0.3rem;
 		font-size: 0.85rem;
 		color: var(--text-muted);
+	}
+
+	.version {
+		position: fixed;
+		right: 8px;
+		bottom: 8px;
+		font-size: 0.85rem;
+		color: rgba(255, 255, 255, 0.45);
 	}
 </style>
