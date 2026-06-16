@@ -1,0 +1,9 @@
+name = "ad-game"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_date = "2025-06-01"
+assets = { directory = ".svelte-kit/cloudflare", binding = "ASSETS" }
+workers_dev = false
+
+routes = [
+	{ pattern = "ad-game.atarigo.io", custom_domain = true }
+]
