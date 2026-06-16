@@ -33,11 +33,13 @@
 
 <style>
 	.shell {
-		min-height: 100dvh;
+		height: 100dvh;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		background: linear-gradient(180deg, #0a0a12 0%, #1a0a2e 100%);
+		overflow: hidden;
+		padding-bottom: env(safe-area-inset-bottom, 0px);
 	}
 
 	header {
@@ -91,16 +93,18 @@
 		flex: 1;
 		width: 100%;
 		max-width: 420px;
+		min-height: 0;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		overflow: hidden;
-		padding: 0.25rem;
+		touch-action: none;
+		-webkit-user-select: none;
+		user-select: none;
 	}
 
 	.canvas-wrap :global(canvas) {
 		display: block;
-		border-radius: 4px;
-		image-rendering: -webkit-optimize-contrast;
+		touch-action: none;
 	}
 </style>

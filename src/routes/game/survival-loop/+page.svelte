@@ -593,11 +593,9 @@
 		joyKnob.circle(0, 0, JOY_KNOB).fill({ color: 0xffffff, alpha: 0.3 });
 		joyContainer.addChild(joyKnob);
 
-		function tapTarget(screenX: number, screenY: number) {
-			const pos = { x: screenX, y: screenY };
-			const wLocal = world.toLocal(pos);
-			const wx = Math.max(10, Math.min(WW - 10, wLocal.x));
-			const wy = Math.max(10, Math.min(WH - 10, wLocal.y));
+		function tapTarget(appX: number, appY: number) {
+			const wx = Math.max(10, Math.min(WW - 10, appX - world.x));
+			const wy = Math.max(10, Math.min(WH - 10, appY - world.y));
 
 			let bestTree: Tree | null = null;
 			let bestD = 30;
@@ -620,8 +618,92 @@
 			P.tgt = null;
 		}
 
+		// Use native touch events to bypass Chrome's gesture interception
+		const canvas = app.canvas;
+
+		function canvasToApp(cx: number, cy: number) {
+			const rect = canvas.getBoundingClientRect();
+			return { x: (cx - rect.left) / rect.width * W, y: (cy - rect.top) / rect.height * H };
+		}
+
+		canvas.addEventListener('touchstart', function (e: TouchEvent) {
+			e.preventDefault();
+			if (state !== 'playing') return;
+			const t = e.changedTouches[0];
+			const p = canvasToApp(t.clientX, t.clientY);
+			joyId = t.identifier;
+			tapStartX = p.x;
+			tapStartY = p.y;
+			tapTime = Date.now();
+			joyBaseX = p.x;
+			joyBaseY = p.y;
+			joyDx = 0;
+			joyDy = 0;
+			joyActive = false;
+			joyContainer.x = p.x;
+			joyContainer.y = p.y;
+			joyKnob.x = 0;
+			joyKnob.y = 0;
+		}, { passive: false });
+
+		canvas.addEventListener('touchmove', function (e: TouchEvent) {
+			e.preventDefault();
+			for (let i = 0; i < e.changedTouches.length; i++) {
+				const t = e.changedTouches[i];
+				if (t.identifier !== joyId) continue;
+				const p = canvasToApp(t.clientX, t.clientY);
+				const mdx = p.x - joyBaseX;
+				const mdy = p.y - joyBaseY;
+				const md = Math.sqrt(mdx * mdx + mdy * mdy);
+				if (!joyActive && md > JOY_DEAD) {
+					joyActive = true;
+					joyContainer.visible = true;
+				}
+				if (joyActive) {
+					const clamped = Math.min(md, JOY_R);
+					const nx = md > 0 ? mdx / md : 0;
+					const ny = md > 0 ? mdy / md : 0;
+					joyKnob.x = nx * clamped;
+					joyKnob.y = ny * clamped;
+					joyDx = nx * (clamped / JOY_R);
+					joyDy = ny * (clamped / JOY_R);
+				}
+			}
+		}, { passive: false });
+
+		canvas.addEventListener('touchend', function (e: TouchEvent) {
+			for (let i = 0; i < e.changedTouches.length; i++) {
+				const t = e.changedTouches[i];
+				if (t.identifier !== joyId) continue;
+				if (!joyActive) {
+					const elapsed = Date.now() - tapTime;
+					const p = canvasToApp(t.clientX, t.clientY);
+					const tdx = p.x - tapStartX;
+					const tdy = p.y - tapStartY;
+					if (elapsed < 300 && Math.sqrt(tdx * tdx + tdy * tdy) < 15) {
+						tapTarget(tapStartX, tapStartY);
+					}
+				}
+				joyActive = false;
+				joyId = -1;
+				joyDx = 0;
+				joyDy = 0;
+				joyContainer.visible = false;
+			}
+		});
+
+		canvas.addEventListener('touchcancel', function () {
+			joyActive = false;
+			joyId = -1;
+			joyDx = 0;
+			joyDy = 0;
+			joyContainer.visible = false;
+		});
+
+		// Mouse fallback for desktop (PixiJS pointer events)
 		clickArea.on('pointerdown', function (e: any) {
 			if (state !== 'playing') return;
+			if (e.pointerType === 'touch') return;
 			const gx = e.global.x;
 			const gy = e.global.y;
 			joyId = e.pointerId;
@@ -643,18 +725,17 @@
 		app.stage.hitArea = { contains: function () { return true; } };
 
 		app.stage.on('pointermove', function (e: any) {
+			if (e.pointerType === 'touch') return;
 			if (joyId < 0) return;
 			const gx = e.global.x;
 			const gy = e.global.y;
 			const mdx = gx - joyBaseX;
 			const mdy = gy - joyBaseY;
 			const md = Math.sqrt(mdx * mdx + mdy * mdy);
-
 			if (!joyActive && md > JOY_DEAD) {
 				joyActive = true;
 				joyContainer.visible = true;
 			}
-
 			if (joyActive) {
 				const clamped = Math.min(md, JOY_R);
 				const nx = md > 0 ? mdx / md : 0;
@@ -667,6 +748,7 @@
 		});
 
 		app.stage.on('pointerup', function (e: any) {
+			if (e.pointerType === 'touch') return;
 			if (e.pointerId !== joyId) return;
 			if (!joyActive) {
 				const elapsed = Date.now() - tapTime;
@@ -676,15 +758,6 @@
 					tapTarget(tapStartX, tapStartY);
 				}
 			}
-			joyActive = false;
-			joyId = -1;
-			joyDx = 0;
-			joyDy = 0;
-			joyContainer.visible = false;
-		});
-
-		app.stage.on('pointerupoutside', function (e: any) {
-			if (e.pointerId !== joyId) return;
 			joyActive = false;
 			joyId = -1;
 			joyDx = 0;
@@ -707,6 +780,7 @@
 		app.ticker.add(function () {
 			if (state !== 'playing') return;
 			const dt = Math.min(app.ticker.deltaMS, 33);
+			const tf = dt / 16.67;
 
 			// Timer
 			timer -= dt;
@@ -715,8 +789,8 @@
 			// Snow
 			for (let i = 0; i < flakes.length; i++) {
 				const f = flakes[i];
-				f.y += f.s;
-				f.x += f.d;
+				f.y += f.s * tf;
+				f.x += f.d * tf;
 				if (f.y > WH) { f.y = -3; f.x = Math.random() * WW; }
 				if (f.x < 0) f.x = WW;
 				if (f.x > WW) f.x = 0;
@@ -770,8 +844,8 @@
 			const inRange = P.tgt && dist(P.x, P.y, P.tgt.x, P.tgt.y) < 30;
 
 			if (directInput) {
-				P.x += inputDx * SPD;
-				P.y += inputDy * SPD;
+				P.x += inputDx * SPD * tf;
+				P.y += inputDy * SPD * tf;
 				P.x = Math.max(10, Math.min(WW - 10, P.x));
 				P.y = Math.max(10, Math.min(WH - 10, P.y));
 				P.tx = P.x;
@@ -793,8 +867,8 @@
 				const dy = P.ty - P.y;
 				const d = Math.sqrt(dx * dx + dy * dy);
 				if (d > 3 && !inRange) {
-					P.x += (dx / d) * SPD;
-					P.y += (dy / d) * SPD;
+					P.x += (dx / d) * SPD * tf;
+					P.y += (dy / d) * SPD * tf;
 					if (Math.abs(dx) > 0.5) P.face = dx > 0 ? 1 : -1;
 					moving = true;
 				}
@@ -830,8 +904,8 @@
 			for (let i = 0; i < drops.length; i++) {
 				const dd = drops[i];
 				if (dd.flying || dd.landed) continue;
-				dd.vy += 0.2;
-				dd.gfx.y += dd.vy;
+				dd.vy += 0.2 * tf;
+				dd.gfx.y += dd.vy * tf;
 				if (dd.gfx.y >= dd.bounceY) {
 					dd.gfx.y = dd.bounceY;
 					dd.vy = -dd.vy * 0.3;
@@ -960,11 +1034,11 @@
 					a.vy2 = (Math.random() - 0.5) * 0.5;
 					a.mt = 1500 + Math.random() * 2000;
 				}
-				a.x += a.vx;
-				a.y += a.vy2;
+				a.x += a.vx * tf;
+				a.y += a.vy2 * tf;
 				if (dist(a.x, a.y, HUNT.x, HUNT.y) > HUNT.r - 10) {
 					a.vx *= -1; a.vy2 *= -1;
-					a.x += a.vx * 2; a.y += a.vy2 * 2;
+					a.x += a.vx * 2 * tf; a.y += a.vy2 * 2 * tf;
 				}
 				if (!a.c.destroyed) { a.c.x = a.x; a.c.y = a.y; a.c.zIndex = a.y; }
 			}
@@ -984,7 +1058,7 @@
 					if (d2 > 8) {
 						const ddx = BENTO.x - wk.x, ddy = (BENTO.y + 15) - wk.y;
 						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-						wk.x += (ddx / dd) * 2.5; wk.y += (ddy / dd) * 2.5;
+						wk.x += (ddx / dd) * 2.5 * tf; wk.y += (ddy / dd) * 2.5 * tf;
 						if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
 						wk.walkT++;
 					} else { wk.hunger = 'eating'; wk.walkT = 0; }
@@ -997,7 +1071,7 @@
 					if (d2 > 8) {
 						const ddx = wk.homeX - wk.x, ddy = wk.homeY - wk.y;
 						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-						wk.x += (ddx / dd) * 2.5; wk.y += (ddy / dd) * 2.5;
+						wk.x += (ddx / dd) * 2.5 * tf; wk.y += (ddy / dd) * 2.5 * tf;
 						if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
 						wk.walkT++;
 					} else { wk.hunger = 'working'; wk.walkT = 0; }
@@ -1019,7 +1093,7 @@
 							if (d2 > 25) {
 								const ddx = wk.tgt.x - wk.x, ddy = wk.tgt.y - wk.y;
 								const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-								wk.x += (ddx / dd) * 2; wk.y += (ddy / dd) * 2;
+								wk.x += (ddx / dd) * 2 * tf; wk.y += (ddy / dd) * 2 * tf;
 								if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
 								wk.walkT++;
 							} else {
@@ -1053,7 +1127,7 @@
 							if (d2 > 25) {
 								const ddx = wk.tgt.x - wk.x, ddy = wk.tgt.y - wk.y;
 								const dd = Math.sqrt(ddx * ddx + ddy * ddy);
-								wk.x += (ddx / dd) * 2; wk.y += (ddy / dd) * 2;
+								wk.x += (ddx / dd) * 2 * tf; wk.y += (ddy / dd) * 2 * tf;
 								if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
 								wk.walkT++;
 							} else {
