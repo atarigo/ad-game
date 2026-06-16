@@ -1,5 +1,17 @@
 <script lang="ts">
-	const games: { slug: string; name: string; description: string }[] = [];
+	const games: { slug: string; name: string; description: string }[] = [
+		{ slug: 'pull-the-pin', name: '拔釘子', description: '拔掉釘子讓水流到杯子裡！' },
+		{ slug: 'hero-rescue', name: '英雄救援', description: '99% 的人選錯了！選對道具拯救英雄。' },
+		{ slug: 'number-merge', name: '數字合體', description: '丟下數字球，相同數字合併成長！' },
+		{ slug: 'parking-jam', name: '停車場', description: '滑動車輛，讓紅色車開出去！' },
+		{ slug: 'stick-hero', name: '棍子英雄', description: '按住伸長棍子，搭橋跨越平台！' },
+		{ slug: 'ball-sort', name: '球球分類', description: '把同色球分到同一管子裡。' },
+		{ slug: 'money-run', name: '金幣跑酷', description: '穿過乘法門，看你能累積多少金幣！' },
+		{ slug: 'bug-squash', name: '打蟲蟲', description: '30 秒內盡量消滅蟲子！' },
+		{ slug: 'fish-hook', name: '釣魚大師', description: '放下魚鉤，釣到大魚得高分！' },
+		{ slug: 'tower-stack', name: '疊疊高塔', description: '對準位置疊方塊，疊越高越好！' },
+		{ slug: 'survival-loop', name: '末日生存', description: '砍柴、打獵、賺錢、升級營地！' },
+	];
 </script>
 
 <svelte:head>

@@ -67,8 +67,16 @@ spec/<game-name>.md     — 各遊戲的獨立規格書
 
 ## 遊戲清單
 
-尚未新增任何遊戲。新增時在此登錄：
-
-| 路由 | 規格文件 | 說明 |
-|------|----------|------|
-| —    | —        | —    |
+| 路由 | 規格文件 | 說明 | 技術 |
+|------|----------|------|------|
+| `/game/pull-the-pin` | [pull-the-pin.md](pull-the-pin.md) | 拔釘子讓水流到杯子 | PixiJS + Matter.js |
+| `/game/hero-rescue` | [hero-rescue.md](hero-rescue.md) | 選對道具救英雄 | PixiJS |
+| `/game/number-merge` | [number-merge.md](number-merge.md) | 丟數字球合併到 2048 | PixiJS + Matter.js |
+| `/game/parking-jam` | [parking-jam.md](parking-jam.md) | 滑動車輛讓紅車離開 | PixiJS |
+| `/game/stick-hero` | [stick-hero.md](stick-hero.md) | 長按伸棍搭橋過平台 | PixiJS |
+| `/game/ball-sort` | [ball-sort.md](ball-sort.md) | 同色球分到同一管 | PixiJS |
+| `/game/money-run` | [money-run.md](money-run.md) | 穿過乘法門累積金幣 | PixiJS |
+| `/game/bug-squash` | [bug-squash.md](bug-squash.md) | 30 秒內消滅蟲子 | PixiJS |
+| `/game/fish-hook` | [fish-hook.md](fish-hook.md) | 放魚鉤釣魚得分 | PixiJS |
+| `/game/tower-stack` | [tower-stack.md](tower-stack.md) | 對準疊方塊疊高塔 | PixiJS |
+| `/game/survival-loop` | [survival-loop.md](survival-loop.md) | 砍柴打獵賺錢升級營地 | PixiJS |
