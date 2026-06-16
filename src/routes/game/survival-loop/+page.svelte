@@ -14,667 +14,817 @@
 
 	let containerEl: HTMLDivElement;
 	let cleanup: (() => void) | undefined;
-	let state = $state<'playing' | 'maxed'>('playing');
+	let state = $state<'playing' | 'win'>('playing');
 
 	async function startGame() {
 		if (cleanup) cleanup();
 		containerEl.innerHTML = '';
 		state = 'playing';
-
 		const { app, cleanup: appCleanup } = await initApp(containerEl, 0x0c1a0c);
 
-		// --- Game State ---
-		let wood = 0;
-		let meat = 0;
-		let coins = 0;
-		let axeLevel = 1;
-		let weaponLevel = 1;
-		let campLevel = 1;
+		const WW = 1000;
+		const GY = 480;
+		const SPD = 2.5;
+		const CAP = 5;
+		const ACD = 600;
+		const PR = 40;
+		const DR = 50;
+		const DMG = 4;
+		const MAX_LV = 10;
 
-		const MAX_LEVEL = 10;
+		const ZX = { forest: 130, woodStn: 320, bento: 500, meatStn: 680, hunt: 870 };
+		const FSPAN = 120;
+		const HSPAN = 120;
 
-		function axePower() { return axeLevel * 2; }
-		function weaponPower() { return weaponLevel * 2; }
-		function autoRate() { return campLevel >= 3 ? (campLevel - 2) * 2 : 0; }
-		function upgradeCost(level: number) { return Math.floor(10 * Math.pow(1.8, level - 1)); }
+		// --- Layers ---
+		const world = new Container();
+		const staticLayer = new Container();
+		const snowLayer = new Container();
+		const clickArea = new Graphics();
+		const objLayer = new Container();
+		const itemLayer = new Container();
+		const charLayer = new Container();
+		const fxLayer = new Container();
+		world.addChild(staticLayer, snowLayer, clickArea, objLayer, itemLayer, charLayer, fxLayer);
+		app.stage.addChild(world);
+		const hudLayer = new Container();
+		app.stage.addChild(hudLayer);
 
-		// --- Layout Constants ---
-		const GROUND_Y = 480;
-		const HUD_Y = 10;
-		const SHOP_Y = 540;
-		const TREE_AREA_X = 30;
-		const TREE_AREA_W = 140;
-		const ANIMAL_AREA_X = 230;
-		const ANIMAL_AREA_W = 140;
-		const CAMP_X = W / 2;
-		const CAMP_Y = 350;
+		// --- Background ---
+		const bg = new Graphics();
+		bg.rect(0, 0, WW, GY).fill(0x0c1a0c);
+		bg.rect(0, GY, WW, H - GY).fill(0x1a3a1a);
+		bg.rect(0, GY, WW, 3).fill(0x2a5a2a);
+		staticLayer.addChild(bg);
 
-		// --- Ground ---
-		const ground = new Graphics();
-		ground.rect(0, GROUND_Y, W, H - GROUND_Y);
-		ground.fill(0x1a3a1a);
-		ground.rect(0, GROUND_Y, W, 3);
-		ground.fill(0x2a5a2a);
-		app.stage.addChild(ground);
+		const forestBg = new Graphics();
+		forestBg.rect(ZX.forest - FSPAN, GY - 200, FSPAN * 2, 200).fill({ color: 0x0a2a0a, alpha: 0.3 });
+		staticLayer.addChild(forestBg);
+		const huntBg = new Graphics();
+		huntBg.rect(ZX.hunt - HSPAN, GY - 200, HSPAN * 2, 200).fill({ color: 0x2a1a0a, alpha: 0.3 });
+		staticLayer.addChild(huntBg);
 
-		// Snow/frost particles for atmosphere
-		const snowContainer = new Container();
-		app.stage.addChild(snowContainer);
-		interface Snowflake { gfx: Graphics; x: number; y: number; speed: number; drift: number; }
-		const snowflakes: Snowflake[] = [];
-		for (let i = 0; i < 30; i++) {
-			const g = new Graphics();
-			const size = 1 + Math.random() * 2;
-			g.circle(0, 0, size);
-			g.fill({ color: 0xffffff, alpha: 0.3 + Math.random() * 0.3 });
-			const s: Snowflake = {
-				gfx: g,
-				x: Math.random() * W,
-				y: Math.random() * GROUND_Y,
-				speed: 0.3 + Math.random() * 0.8,
-				drift: (Math.random() - 0.5) * 0.5,
-			};
-			g.x = s.x;
-			g.y = s.y;
-			snowContainer.addChild(g);
-			snowflakes.push(s);
-		}
-
-		// --- HUD ---
-		const hudBg = new Graphics();
-		hudBg.rect(0, 0, W, 70);
-		hudBg.fill({ color: 0x000000, alpha: 0.5 });
-		app.stage.addChild(hudBg);
-
-		const woodIcon = centeredText('🪵', 30, 25, { size: 18, family: 'Arial' });
-		app.stage.addChild(woodIcon);
-		const woodText = centeredText('0', 80, 25, { size: 16, color: COLORS.yellow, family: 'Arial' });
-		app.stage.addChild(woodText);
-
-		const meatIcon = centeredText('🥩', 150, 25, { size: 18, family: 'Arial' });
-		app.stage.addChild(meatIcon);
-		const meatText = centeredText('0', 200, 25, { size: 16, color: COLORS.yellow, family: 'Arial' });
-		app.stage.addChild(meatText);
-
-		const coinIcon = centeredText('💰', 280, 25, { size: 18, family: 'Arial' });
-		app.stage.addChild(coinIcon);
-		const coinText = centeredText('0', 340, 25, { size: 20, color: COLORS.gold, family: 'Arial' });
-		app.stage.addChild(coinText);
-
-		const levelLabel = centeredText('', W / 2, 55, { size: 11, color: COLORS.muted, family: 'Arial' });
-		app.stage.addChild(levelLabel);
-
-		function updateHUD() {
-			woodText.text = String(wood);
-			meatText.text = String(meat);
-			coinText.text = String(coins);
-			levelLabel.text = `斧 Lv${axeLevel}  |  刀 Lv${weaponLevel}  |  營地 Lv${campLevel}`;
-		}
-
-		// --- Camp (center, upgradeable visual) ---
-		const campContainer = new Container();
-		campContainer.x = CAMP_X;
-		campContainer.y = CAMP_Y;
-		app.stage.addChild(campContainer);
-
-		function drawCamp() {
-			campContainer.removeChildren();
-			const size = 20 + campLevel * 8;
-
-			// Base
-			const base = new Graphics();
-			base.rect(-size, -size * 0.3, size * 2, size * 0.6);
-			base.fill(0x5a3a1a);
-			base.rect(-size, -size * 0.3, size * 2, size * 0.6);
-			base.stroke({ color: 0x7a5a3a, width: 2 });
-			campContainer.addChild(base);
-
-			// Roof (triangle)
-			const roof = new Graphics();
-			roof.moveTo(-size - 5, -size * 0.3);
-			roof.lineTo(0, -size * 0.3 - size * 0.6);
-			roof.lineTo(size + 5, -size * 0.3);
-			roof.closePath();
-			roof.fill(0x8a2a1a);
-			campContainer.addChild(roof);
-
-			// Door
-			const door = new Graphics();
-			door.rect(-8, -size * 0.1, 16, size * 0.4);
-			door.fill(0x3a2a0a);
-			campContainer.addChild(door);
-
-			// Campfire
-			if (campLevel >= 2) {
-				const fire = new Graphics();
-				fire.circle(size + 20, 5, 6);
-				fire.fill(COLORS.orange);
-				fire.circle(size + 20, 0, 4);
-				fire.fill(COLORS.yellow);
-				campContainer.addChild(fire);
-			}
-
-			// Flag
-			if (campLevel >= 4) {
-				const pole = new Graphics();
-				pole.moveTo(-size - 10, -size * 0.3 - size * 0.6);
-				pole.lineTo(-size - 10, -size * 0.3 - size * 0.6 - 25);
-				pole.stroke({ color: 0x888888, width: 2 });
-				campContainer.addChild(pole);
-
-				const flag = new Graphics();
-				flag.moveTo(-size - 10, -size * 0.3 - size * 0.6 - 25);
-				flag.lineTo(-size + 5, -size * 0.3 - size * 0.6 - 18);
-				flag.lineTo(-size - 10, -size * 0.3 - size * 0.6 - 11);
-				flag.closePath();
-				flag.fill(COLORS.red);
-				campContainer.addChild(flag);
-			}
-
-			// Fence
-			if (campLevel >= 6) {
-				const fence = new Graphics();
-				for (let i = -3; i <= 3; i++) {
-					const fx = i * 15;
-					if (Math.abs(fx) < size + 5) continue;
-					fence.rect(fx - 2, -5, 4, 20);
-					fence.fill(0x6a4a2a);
-				}
-				campContainer.addChild(fence);
-			}
-
-			// Level indicator
-			const lvl = centeredText(`Lv${campLevel}`, 0, size * 0.3 + 16, {
-				size: 11,
-				color: COLORS.muted,
-				family: 'Arial'
-			});
-			campContainer.addChild(lvl);
-		}
-
-		drawCamp();
-
-		// --- Trees ---
-		interface TreeObj {
-			gfx: Container;
-			x: number;
-			y: number;
-			hp: number;
-			maxHp: number;
-			hpBar: Graphics;
-		}
-		const trees: TreeObj[] = [];
-		let treeSpawnTimer = 0;
-
-		function spawnTree() {
-			const x = TREE_AREA_X + Math.random() * TREE_AREA_W;
-			const y = GROUND_Y - 10 - Math.random() * 60;
-			const maxHp = 3 + Math.floor(Math.random() * 3) + campLevel;
-
+		// --- Stations ---
+		function makeStn(x: number, emoji: string, label: string, col: number) {
 			const c = new Container();
 			c.x = x;
-			c.y = y;
+			c.y = GY;
+			const p = new Graphics();
+			p.rect(-30, -6, 60, 6).fill(0x5a4a3a).rect(-30, -6, 60, 6).stroke({ color: 0x7a6a5a, width: 1 });
+			c.addChild(p);
+			const post = new Graphics();
+			post.rect(-2, -32, 4, 26).fill(0x6a5a4a);
+			c.addChild(post);
+			const sign = new Graphics();
+			sign.roundRect(-16, -42, 32, 13, 3).fill(col);
+			c.addChild(sign);
+			c.addChild(centeredText(emoji, 0, -36, { size: 10, family: 'Arial' }));
+			staticLayer.addChild(c);
+			staticLayer.addChild(centeredText(label, x, GY + 18, { size: 9, color: COLORS.muted, family: 'Arial' }));
+		}
+		makeStn(ZX.woodStn, '🪵', '木材站', 0x6a4a2a);
+		makeStn(ZX.meatStn, '🥩', '肉品站', 0x8a3a2a);
 
-			// Trunk
-			const trunk = new Graphics();
-			trunk.rect(-6, -30, 12, 40);
-			trunk.fill(0x6a4a2a);
-			c.addChild(trunk);
+		// Bento shop
+		const shopC = new Container();
+		shopC.x = ZX.bento;
+		shopC.y = GY;
+		const shopB = new Graphics();
+		shopB.rect(-22, -45, 44, 45).fill(0x4a3a2a).rect(-22, -45, 44, 45).stroke({ color: 0x6a5a4a, width: 1 });
+		shopC.addChild(shopB);
+		const shopR = new Graphics();
+		shopR.moveTo(-27, -45).lineTo(0, -58).lineTo(27, -45).closePath().fill(0x8a2a1a);
+		shopC.addChild(shopR);
+		shopC.addChild(centeredText('🍱', 0, -28, { size: 14, family: 'Arial' }));
+		staticLayer.addChild(shopC);
+		staticLayer.addChild(centeredText('便當店', ZX.bento, GY + 18, { size: 9, color: COLORS.muted, family: 'Arial' }));
+		staticLayer.addChild(centeredText('🌲 森林', ZX.forest, GY + 18, { size: 9, color: COLORS.muted, family: 'Arial' }));
+		staticLayer.addChild(centeredText('🎯 獵場', ZX.hunt, GY + 18, { size: 9, color: COLORS.muted, family: 'Arial' }));
 
-			// Leaves (triangle)
-			const leaves = new Graphics();
-			leaves.moveTo(0, -65);
-			leaves.lineTo(22, -25);
-			leaves.lineTo(-22, -25);
-			leaves.closePath();
-			leaves.fill(0x2a6a2a);
-			leaves.moveTo(0, -50);
-			leaves.lineTo(18, -15);
-			leaves.lineTo(-18, -15);
-			leaves.closePath();
-			leaves.fill(0x3a7a3a);
-			c.addChild(leaves);
+		const woodStockT = centeredText('', ZX.woodStn, GY - 52, { size: 10, color: COLORS.yellow, family: 'Arial' });
+		const meatStockT = centeredText('', ZX.meatStn, GY - 52, { size: 10, color: COLORS.yellow, family: 'Arial' });
+		const woodLvT = centeredText('Lv1', ZX.woodStn, GY - 63, { size: 9, color: COLORS.cyan, family: 'Arial' });
+		const meatLvT = centeredText('Lv1', ZX.meatStn, GY - 63, { size: 9, color: COLORS.cyan, family: 'Arial' });
+		staticLayer.addChild(woodStockT, meatStockT, woodLvT, meatLvT);
 
-			// HP bar
-			const hpBar = new Graphics();
-			c.addChild(hpBar);
+		// --- Snow ---
+		interface Flake { g: Graphics; x: number; y: number; s: number; d: number }
+		const flakes: Flake[] = [];
+		for (let i = 0; i < 40; i++) {
+			const g = new Graphics();
+			g.circle(0, 0, 1 + Math.random() * 1.5).fill({ color: 0xffffff, alpha: 0.2 + Math.random() * 0.25 });
+			const f: Flake = { g, x: Math.random() * WW, y: Math.random() * GY, s: 0.3 + Math.random() * 0.5, d: (Math.random() - 0.5) * 0.3 };
+			g.x = f.x;
+			g.y = f.y;
+			snowLayer.addChild(g);
+			flakes.push(f);
+		}
 
-			c.eventMode = 'static';
-			c.cursor = 'pointer';
+		// --- Click area ---
+		clickArea.rect(0, 0, WW, H).fill({ color: 0x000000, alpha: 0.001 });
+		clickArea.eventMode = 'static';
+		clickArea.cursor = 'pointer';
 
-			app.stage.addChild(c);
+		// --- Game State ---
+		type IType = 'wood' | 'meat' | 'bento';
+		interface Drop {
+			type: IType | 'coin';
+			x: number;
+			y: number;
+			gfx: Graphics;
+			vy: number;
+			landed: boolean;
+			flying: boolean;
+		}
+		interface Tree {
+			c: Container;
+			x: number;
+			hp: number;
+			max: number;
+			bar: Graphics;
+		}
+		interface Beast {
+			c: Container;
+			x: number;
+			hp: number;
+			max: number;
+			bar: Graphics;
+			vx: number;
+			mt: number;
+		}
 
-			const tree: TreeObj = { gfx: c, x, y, hp: maxHp, maxHp, hpBar };
-			trees.push(tree);
+		const drops: Drop[] = [];
+		const trees: Tree[] = [];
+		const beasts: Beast[] = [];
 
-			function drawHpBar() {
-				hpBar.clear();
-				const bw = 30;
-				hpBar.rect(-bw / 2, -72, bw, 5);
-				hpBar.fill({ color: 0x333333, alpha: 0.6 });
-				hpBar.rect(-bw / 2, -72, bw * (tree.hp / tree.maxHp), 5);
-				hpBar.fill(COLORS.green);
-			}
-			drawHpBar();
+		let coins = 0;
+		let wStock = 0, wLv = 1, wWorker = false, wProdT = 0;
+		let mStock = 0, mLv = 1, mWorker = false, mProdT = 0;
+		let hasCutter = false, hasHunter = false;
+		let cutterT = 0, hunterT = 0;
 
-			c.on('pointerdown', () => {
-				if (state !== 'playing') return;
-				tree.hp -= axePower();
+		function ucost(lv: number) {
+			return Math.floor(10 * Math.pow(1.8, lv - 1));
+		}
+		function prodMs(lv: number, worker: boolean) {
+			return (worker ? 3000 : 6000) / (1 + (lv - 1) * 0.3);
+		}
 
-				// Hit effect
-				const popup = centeredText(`-${axePower()}`, x + (Math.random() - 0.5) * 20, y - 80, {
-					size: 14,
-					color: COLORS.yellow,
-					family: 'Arial'
-				});
-				app.stage.addChild(popup);
-				let popT = 0;
-				const popTick = () => {
-					popT += 0.04;
-					popup.y -= 1.5;
-					popup.alpha = 1 - popT;
-					if (popT >= 1) { app.ticker.remove(popTick); popup.destroy(); }
-				};
-				app.ticker.add(popTick);
+		// --- Player ---
+		const P = {
+			x: ZX.bento,
+			tx: ZX.bento,
+			carry: [] as IType[],
+			face: 1,
+			atkT: 0,
+			walkT: 0,
+			tgt: null as Tree | Beast | null
+		};
 
-				// Shake
-				c.x = x + (Math.random() - 0.5) * 6;
-				setTimeout(() => { c.x = x; }, 80);
+		const pC = new Container();
+		const pBody = new Container();
+		pC.addChild(pBody);
 
-				if (tree.hp <= 0) {
-					const gained = 2 + axeLevel;
-					wood += gained;
+		const pLL = new Graphics();
+		pLL.rect(-5, 12, 4, 12).fill(0x4a4a6a);
+		const pRL = new Graphics();
+		pRL.rect(1, 12, 4, 12).fill(0x4a4a6a);
+		const pTorso = new Graphics();
+		pTorso.rect(-6, -4, 12, 18).fill(0x3a6aaa);
+		const pHead = new Graphics();
+		pHead.circle(0, -12, 8).fill(0xdda070);
+		const pEye = new Graphics();
+		pEye.circle(3, -13, 1.5).fill(0x222222);
+		pBody.addChild(pLL, pRL, pTorso, pHead, pEye);
 
-					const woodPopup = centeredText(`+${gained} 🪵`, x, y - 90, {
-						size: 16,
-						color: COLORS.green,
-						family: 'Arial'
-					});
-					app.stage.addChild(woodPopup);
-					let wt = 0;
-					const wtick = () => {
-						wt += 0.03;
-						woodPopup.y -= 1;
-						woodPopup.alpha = 1 - wt;
-						if (wt >= 1) { app.ticker.remove(wtick); woodPopup.destroy(); }
-					};
-					app.ticker.add(wtick);
+		const pCarryT = centeredText('', 0, -28, { size: 8, color: COLORS.yellow, family: 'Arial' });
+		pC.addChild(pCarryT);
+		pC.x = P.x;
+		pC.y = GY;
+		charLayer.addChild(pC);
 
-					c.destroy();
-					const idx = trees.indexOf(tree);
-					if (idx >= 0) trees.splice(idx, 1);
-					updateHUD();
-				} else {
-					drawHpBar();
+		function carryText(): string {
+			const c: Record<string, number> = {};
+			for (const i of P.carry) c[i] = (c[i] || 0) + 1;
+			const p: string[] = [];
+			if (c.wood) p.push(`🪵${c.wood}`);
+			if (c.meat) p.push(`🥩${c.meat}`);
+			if (c.bento) p.push(`🍱${c.bento}`);
+			return p.join(' ');
+		}
+
+		// --- Helpers ---
+		function popup(s: string, x: number, y: number, col: number) {
+			const t = centeredText(s, x, y, { size: 12, color: col, family: 'Arial' });
+			fxLayer.addChild(t);
+			let p = 0;
+			const tk = () => {
+				p += 0.03;
+				t.y -= 1;
+				t.alpha = 1 - p;
+				if (p >= 1) {
+					app.ticker.remove(tk);
+					t.destroy();
 				}
+			};
+			app.ticker.add(tk);
+		}
+
+		function mkGfx(type: IType | 'coin'): Graphics {
+			const g = new Graphics();
+			if (type === 'wood') g.roundRect(-5, -3, 10, 6, 1).fill(0x8a6a3a).rect(-3, -1, 6, 2).fill(0x6a4a2a);
+			else if (type === 'meat') g.circle(0, 0, 5).fill(0xcc4444).circle(-1, -1, 2).fill(0xee6666);
+			else if (type === 'coin') g.circle(0, 0, 5).fill(COLORS.gold).circle(0, 0, 3).fill(0xeebb00);
+			else g.rect(-5, -4, 10, 8).fill(0xeeeeee).rect(-3, -1, 6, 3).fill(0xcc4444);
+			return g;
+		}
+
+		function spawnDrop(type: IType | 'coin', x: number, y: number) {
+			const gfx = mkGfx(type);
+			gfx.x = x + (Math.random() - 0.5) * 25;
+			gfx.y = y;
+			itemLayer.addChild(gfx);
+			drops.push({
+				type,
+				x: gfx.x,
+				y: gfx.y,
+				gfx,
+				vy: -2.5 - Math.random() * 1.5,
+				landed: false,
+				flying: false
 			});
+		}
+
+		function flyTo(d: Drop, tx: number, ty: number, cb: () => void) {
+			d.flying = true;
+			const fx = d.x,
+				fy = d.y;
+			let t = 0;
+			const tk = () => {
+				t += app.ticker.deltaMS;
+				const p = Math.min(t / 300, 1);
+				d.gfx.x = d.x = fx + (tx - fx) * p;
+				d.gfx.y = d.y = fy + (ty - fy) * p - Math.sin(p * Math.PI) * 50;
+				if (p >= 1) {
+					app.ticker.remove(tk);
+					cb();
+				}
+			};
+			app.ticker.add(tk);
+		}
+
+		function rmDrop(d: Drop) {
+			const i = drops.indexOf(d);
+			if (i >= 0) drops.splice(i, 1);
+			if (!d.gfx.destroyed) d.gfx.destroy();
+		}
+
+		// --- Trees ---
+		function spawnTree() {
+			const x = ZX.forest - FSPAN + 20 + Math.random() * (FSPAN * 2 - 40);
+			const max = 6 + Math.floor(Math.random() * 4);
+			const c = new Container();
+			c.x = x;
+			c.y = GY;
+			const trunk = new Graphics();
+			trunk.rect(-5, -28, 10, 28).fill(0x6a4a2a);
+			c.addChild(trunk);
+			const lv = new Graphics();
+			lv.moveTo(0, -55).lineTo(18, -25).lineTo(-18, -25).closePath().fill(0x2a6a2a);
+			lv.moveTo(0, -45).lineTo(14, -18).lineTo(-14, -18).closePath().fill(0x3a7a3a);
+			c.addChild(lv);
+			const bar = new Graphics();
+			c.addChild(bar);
+			objLayer.addChild(c);
+			const tree: Tree = { c, x, hp: max, max, bar };
+			trees.push(tree);
+			hpBar(bar, max, max, 0, -60, COLORS.green);
+		}
+
+		function hpBar(g: Graphics, hp: number, max: number, ox: number, oy: number, col: number) {
+			g.clear();
+			const bw = 26;
+			g.rect(ox - bw / 2, oy, bw, 4).fill({ color: 0x333333, alpha: 0.5 });
+			g.rect(ox - bw / 2, oy, bw * Math.max(0, hp / max), 4).fill(col);
+		}
+
+		function hitTree(t: Tree) {
+			t.hp -= DMG;
+			t.c.x = t.x + (Math.random() - 0.5) * 6;
+			setTimeout(() => {
+				if (!t.c.destroyed) t.c.x = t.x;
+			}, 80);
+			popup(`-${DMG}`, t.x, GY - 65, COLORS.yellow);
+			if (t.hp <= 0) {
+				t.c.destroy();
+				trees.splice(trees.indexOf(t), 1);
+				const n = 2 + Math.floor(Math.random() * 2);
+				for (let i = 0; i < n; i++) spawnDrop('wood', t.x, GY - 15);
+			} else {
+				hpBar(t.bar, t.hp, t.max, 0, -60, COLORS.green);
+			}
 		}
 
 		// --- Animals ---
-		interface AnimalObj {
-			gfx: Container;
-			x: number;
-			y: number;
-			hp: number;
-			maxHp: number;
-			hpBar: Graphics;
-			vx: number;
-			moveTimer: number;
-		}
-		const animals: AnimalObj[] = [];
-		let animalSpawnTimer = 0;
-
-		function spawnAnimal() {
-			const x = ANIMAL_AREA_X + Math.random() * ANIMAL_AREA_W;
-			const y = GROUND_Y - 5 - Math.random() * 50;
-			const maxHp = 4 + Math.floor(Math.random() * 4) + campLevel;
-
+		function spawnBeast() {
+			const x = ZX.hunt - HSPAN + 20 + Math.random() * (HSPAN * 2 - 40);
+			const max = 8 + Math.floor(Math.random() * 4);
 			const c = new Container();
 			c.x = x;
-			c.y = y;
-
-			// Body (simple quadruped)
+			c.y = GY;
 			const body = new Graphics();
-			body.ellipse(0, -10, 18, 10);
-			body.fill(0x8a6a4a);
+			body.ellipse(0, -10, 16, 9).fill(0x8a6a4a);
 			c.addChild(body);
-
-			// Head
 			const head = new Graphics();
-			head.circle(18, -14, 8);
-			head.fill(0x7a5a3a);
+			head.circle(14, -14, 7).fill(0x7a5a3a);
 			c.addChild(head);
-
-			// Eye
 			const eye = new Graphics();
-			eye.circle(22, -16, 2);
-			eye.fill(COLORS.white);
+			eye.circle(18, -15, 1.5).fill(0xffffff);
 			c.addChild(eye);
-
-			// Legs
 			const legs = new Graphics();
-			legs.rect(-12, -3, 4, 12).fill(0x6a4a2a);
-			legs.rect(-4, -3, 4, 12).fill(0x6a4a2a);
-			legs.rect(4, -3, 4, 12).fill(0x6a4a2a);
-			legs.rect(12, -3, 4, 12).fill(0x6a4a2a);
+			for (const lx of [-10, -3, 4, 11]) legs.rect(lx, -3, 3, 10).fill(0x6a4a2a);
 			c.addChild(legs);
-
-			// HP bar
-			const hpBar = new Graphics();
-			c.addChild(hpBar);
-
-			c.eventMode = 'static';
-			c.cursor = 'pointer';
-
-			app.stage.addChild(c);
-
-			const animal: AnimalObj = {
-				gfx: c, x, y, hp: maxHp, maxHp, hpBar,
-				vx: (Math.random() - 0.5) * 0.8,
-				moveTimer: 1000 + Math.random() * 2000
+			const bar = new Graphics();
+			c.addChild(bar);
+			objLayer.addChild(c);
+			const b: Beast = {
+				c,
+				x,
+				hp: max,
+				max,
+				bar,
+				vx: (Math.random() - 0.5) * 0.5,
+				mt: 1500 + Math.random() * 2000
 			};
-			animals.push(animal);
+			beasts.push(b);
+			hpBar(bar, max, max, 0, -28, COLORS.red);
+		}
 
-			function drawHpBar() {
-				hpBar.clear();
-				const bw = 30;
-				hpBar.rect(-bw / 2, -30, bw, 5);
-				hpBar.fill({ color: 0x333333, alpha: 0.6 });
-				hpBar.rect(-bw / 2, -30, bw * (animal.hp / animal.maxHp), 5);
-				hpBar.fill(COLORS.red);
+		function hitBeast(b: Beast) {
+			b.hp -= DMG;
+			b.c.x = b.x + (Math.random() - 0.5) * 8;
+			setTimeout(() => {
+				if (!b.c.destroyed) b.c.x = b.x;
+			}, 80);
+			popup(`-${DMG}`, b.x, GY - 32, COLORS.red);
+			if (b.hp <= 0) {
+				b.c.destroy();
+				beasts.splice(beasts.indexOf(b), 1);
+				const n = 2 + Math.floor(Math.random() * 2);
+				for (let i = 0; i < n; i++) spawnDrop('meat', b.x, GY - 8);
+			} else {
+				hpBar(b.bar, b.hp, b.max, 0, -28, COLORS.red);
 			}
-			drawHpBar();
-
-			c.on('pointerdown', () => {
-				if (state !== 'playing') return;
-				animal.hp -= weaponPower();
-
-				const popup = centeredText(`-${weaponPower()}`, x + (Math.random() - 0.5) * 20, y - 40, {
-					size: 14,
-					color: COLORS.red,
-					family: 'Arial'
-				});
-				app.stage.addChild(popup);
-				let popT = 0;
-				const popTick = () => {
-					popT += 0.04;
-					popup.y -= 1.5;
-					popup.alpha = 1 - popT;
-					if (popT >= 1) { app.ticker.remove(popTick); popup.destroy(); }
-				};
-				app.ticker.add(popTick);
-
-				c.x = animal.x + (Math.random() - 0.5) * 8;
-				setTimeout(() => { if (!c.destroyed) c.x = animal.x; }, 80);
-
-				if (animal.hp <= 0) {
-					const gained = 2 + weaponLevel;
-					meat += gained;
-
-					const meatPopup = centeredText(`+${gained} 🥩`, animal.x, y - 50, {
-						size: 16,
-						color: COLORS.pink,
-						family: 'Arial'
-					});
-					app.stage.addChild(meatPopup);
-					let mt = 0;
-					const mtick = () => {
-						mt += 0.03;
-						meatPopup.y -= 1;
-						meatPopup.alpha = 1 - mt;
-						if (mt >= 1) { app.ticker.remove(mtick); meatPopup.destroy(); }
-					};
-					app.ticker.add(mtick);
-
-					c.destroy();
-					const idx = animals.indexOf(animal);
-					if (idx >= 0) animals.splice(idx, 1);
-					updateHUD();
-				} else {
-					drawHpBar();
-				}
-			});
 		}
 
-		// --- Shop ---
-		const shopBg = new Graphics();
-		shopBg.rect(0, SHOP_Y - 10, W, H - SHOP_Y + 10);
-		shopBg.fill({ color: 0x000000, alpha: 0.6 });
-		app.stage.addChild(shopBg);
-
-		const shopTitle = centeredText('— 升級商店 —', W / 2, SHOP_Y + 5, {
-			size: 13,
-			color: COLORS.gold,
-			family: 'Arial'
-		});
-		app.stage.addChild(shopTitle);
-
-		interface ShopButton {
-			container: Container;
-			label: Text;
-			costLabel: Text;
-			update: () => void;
-		}
-		const shopButtons: ShopButton[] = [];
-
-		function createShopButton(
-			x: number,
-			y: number,
-			icon: string,
-			getName: () => string,
-			getCost: () => number,
-			canBuy: () => boolean,
-			onBuy: () => void
-		): ShopButton {
+		// --- Workers ---
+		function addWorker(x: number, col: number) {
 			const c = new Container();
 			c.x = x;
+			c.y = GY;
+			const b = new Graphics();
+			b.rect(-4, -2, 8, 14).fill(col);
+			c.addChild(b);
+			const h = new Graphics();
+			h.circle(0, -8, 5).fill(0xdda070);
+			c.addChild(h);
+			charLayer.addChild(c);
+		}
+
+		// --- UI Buttons ---
+		type BtnDef = { update: () => void };
+		const btns: BtnDef[] = [];
+
+		function mkBtn(
+			getText: () => string,
+			isVis: () => boolean,
+			isOn: () => boolean,
+			onClick: () => void,
+			y: number
+		): BtnDef {
+			const c = new Container();
+			c.x = W / 2;
 			c.y = y;
-
 			const bg = new Graphics();
-			bg.roundRect(-55, -22, 110, 44, 6);
-			bg.fill({ color: 0x2a2a3e, alpha: 0.8 });
-			bg.roundRect(-55, -22, 110, 44, 6);
-			bg.stroke({ color: COLORS.cyan, width: 1, alpha: 0.4 });
+			bg.roundRect(-70, -15, 140, 30, 6)
+				.fill({ color: 0x1a1a2e, alpha: 0.9 })
+				.roundRect(-70, -15, 140, 30, 6)
+				.stroke({ color: COLORS.cyan, width: 1, alpha: 0.5 });
 			c.addChild(bg);
-
-			const iconText = centeredText(icon, -35, -5, { size: 16, family: 'Arial' });
-			c.addChild(iconText);
-
-			const label = centeredText(getName(), 10, -8, {
+			const lbl = centeredText(getText(), 0, 0, {
 				size: 11,
 				color: COLORS.white,
 				family: 'Arial'
 			});
-			c.addChild(label);
-
-			const costLabel = centeredText(`💰${getCost()}`, 10, 8, {
-				size: 10,
-				color: COLORS.gold,
-				family: 'Arial'
-			});
-			c.addChild(costLabel);
-
+			c.addChild(lbl);
 			c.eventMode = 'static';
 			c.cursor = 'pointer';
-
+			c.visible = false;
 			c.on('pointerdown', () => {
-				if (!canBuy()) return;
-				onBuy();
-				updateHUD();
-				updateShop();
+				if (isOn()) {
+					onClick();
+					refreshUI();
+				}
 			});
-
-			app.stage.addChild(c);
-
-			const btn: ShopButton = {
-				container: c,
-				label,
-				costLabel,
+			hudLayer.addChild(c);
+			const def: BtnDef = {
 				update() {
-					label.text = getName();
-					const cost = getCost();
-					costLabel.text = cost > 0 ? `💰${cost}` : 'MAX';
-					c.alpha = canBuy() ? 1 : 0.5;
+					const v = isVis();
+					c.visible = v;
+					if (v) {
+						lbl.text = getText();
+						c.alpha = isOn() ? 1 : 0.35;
+					}
 				}
 			};
-			shopButtons.push(btn);
-			return btn;
+			btns.push(def);
+			return def;
 		}
 
-		// Sell buttons
-		const sellWoodBtn = createShopButton(
-			70, SHOP_Y + 40,
-			'🪵→💰',
-			() => '賣木材',
-			() => 0,
-			() => wood >= 5,
-			() => {
-				const sell = Math.min(wood, 10);
-				wood -= sell;
-				coins += sell * (1 + Math.floor(campLevel / 3));
-			}
-		);
+		function nearW() { return Math.abs(P.x - ZX.woodStn) < DR; }
+		function nearM() { return Math.abs(P.x - ZX.meatStn) < DR; }
+		function nearB() { return Math.abs(P.x - ZX.bento) < DR; }
+		function inFor() { return P.x < ZX.forest + FSPAN + 10; }
+		function inHunt() { return P.x > ZX.hunt - HSPAN - 10; }
+		function pHasBento() { return P.carry.includes('bento'); }
 
-		const sellMeatBtn = createShopButton(
-			200, SHOP_Y + 40,
-			'🥩→💰',
-			() => '賣肉',
-			() => 0,
-			() => meat >= 5,
-			() => {
-				const sell = Math.min(meat, 10);
-				meat -= sell;
-				coins += sell * (2 + Math.floor(campLevel / 2));
-			}
-		);
-
-		// Sell buttons show differently
-		sellWoodBtn.costLabel.text = '5+🪵';
-		sellMeatBtn.costLabel.text = '5+🥩';
-
-		const axeBtn = createShopButton(
-			70, SHOP_Y + 90,
-			'🪓',
-			() => `斧 Lv${axeLevel}`,
-			() => axeLevel >= MAX_LEVEL ? 0 : upgradeCost(axeLevel),
-			() => axeLevel < MAX_LEVEL && coins >= upgradeCost(axeLevel),
-			() => { coins -= upgradeCost(axeLevel); axeLevel++; }
-		);
-
-		const weaponBtn = createShopButton(
-			200, SHOP_Y + 90,
-			'🗡',
-			() => `刀 Lv${weaponLevel}`,
-			() => weaponLevel >= MAX_LEVEL ? 0 : upgradeCost(weaponLevel),
-			() => weaponLevel < MAX_LEVEL && coins >= upgradeCost(weaponLevel),
-			() => { coins -= upgradeCost(weaponLevel); weaponLevel++; }
-		);
-
-		const campBtn = createShopButton(
-			W / 2, SHOP_Y + 140,
-			'🏠',
-			() => `營地 Lv${campLevel}`,
-			() => campLevel >= MAX_LEVEL ? 0 : upgradeCost(campLevel) * 2,
-			() => campLevel < MAX_LEVEL && coins >= upgradeCost(campLevel) * 2,
-			() => {
-				coins -= upgradeCost(campLevel) * 2;
-				campLevel++;
-				drawCamp();
-			}
-		);
-
-		function updateShop() {
-			sellWoodBtn.update();
-			sellMeatBtn.update();
-			sellWoodBtn.costLabel.text = `${Math.min(wood, 10)}🪵→💰`;
-			sellMeatBtn.costLabel.text = `${Math.min(meat, 10)}🥩→💰`;
-			sellWoodBtn.container.alpha = wood >= 5 ? 1 : 0.5;
-			sellMeatBtn.container.alpha = meat >= 5 ? 1 : 0.5;
-			axeBtn.update();
-			weaponBtn.update();
-			campBtn.update();
-
-			if (axeLevel >= MAX_LEVEL && weaponLevel >= MAX_LEVEL && campLevel >= MAX_LEVEL) {
-				state = 'maxed';
-			}
+		function useBento() {
+			const i = P.carry.indexOf('bento');
+			if (i >= 0) P.carry.splice(i, 1);
 		}
 
-		// --- Initial spawn ---
+		mkBtn(
+			function () { return '買便當 💰3'; },
+			function () { return nearB(); },
+			function () { return coins >= 3 && P.carry.length < CAP; },
+			function () {
+				coins -= 3;
+				P.carry.push('bento');
+				popup('+🍱', P.x, GY - 40, COLORS.white);
+			},
+			H - 55
+		);
+
+		mkBtn(
+			function () { return wLv >= MAX_LV ? '木材站 MAX' : '⬆木材站Lv' + (wLv + 1) + ' 💰' + ucost(wLv); },
+			function () { return nearW() && wLv < MAX_LV; },
+			function () { return coins >= ucost(wLv); },
+			function () {
+				coins -= ucost(wLv);
+				wLv++;
+				popup('⬆Lv' + wLv, ZX.woodStn, GY - 75, COLORS.cyan);
+				checkWin();
+			},
+			H - 95
+		);
+
+		mkBtn(
+			function () { return mLv >= MAX_LV ? '肉品站 MAX' : '⬆肉品站Lv' + (mLv + 1) + ' 💰' + ucost(mLv); },
+			function () { return nearM() && mLv < MAX_LV; },
+			function () { return coins >= ucost(mLv); },
+			function () {
+				coins -= ucost(mLv);
+				mLv++;
+				popup('⬆Lv' + mLv, ZX.meatStn, GY - 75, COLORS.cyan);
+				checkWin();
+			},
+			H - 95
+		);
+
+		mkBtn(
+			function () { return '雇用站工人 🍱1'; },
+			function () { return nearW() && !wWorker; },
+			function () { return pHasBento(); },
+			function () {
+				useBento();
+				wWorker = true;
+				addWorker(ZX.woodStn + 22, 0x6a8a4a);
+				popup('+👷', ZX.woodStn, GY - 50, COLORS.green);
+			},
+			H - 55
+		);
+
+		mkBtn(
+			function () { return '雇用站工人 🍱1'; },
+			function () { return nearM() && !mWorker; },
+			function () { return pHasBento(); },
+			function () {
+				useBento();
+				mWorker = true;
+				addWorker(ZX.meatStn + 22, 0x8a4a6a);
+				popup('+👷', ZX.meatStn, GY - 50, COLORS.green);
+			},
+			H - 55
+		);
+
+		mkBtn(
+			function () { return '雇用砍柴工 🍱1'; },
+			function () { return inFor() && !hasCutter; },
+			function () { return pHasBento(); },
+			function () {
+				useBento();
+				hasCutter = true;
+				addWorker(ZX.forest + 30, 0x4a8a4a);
+				popup('+🪓', ZX.forest, GY - 50, COLORS.green);
+			},
+			H - 55
+		);
+
+		mkBtn(
+			function () { return '雇用獵人 🍱1'; },
+			function () { return inHunt() && !hasHunter; },
+			function () { return pHasBento(); },
+			function () {
+				useBento();
+				hasHunter = true;
+				addWorker(ZX.hunt - 30, 0x8a6a4a);
+				popup('+🏹', ZX.hunt, GY - 50, COLORS.green);
+			},
+			H - 55
+		);
+
+		// --- HUD ---
+		const hudBg = new Graphics();
+		hudBg.rect(0, 0, W, 35).fill({ color: 0x000000, alpha: 0.6 });
+		hudBg.eventMode = 'static';
+		hudLayer.addChild(hudBg);
+		const coinHud = centeredText('💰 0', W / 2, 18, {
+			size: 14,
+			color: COLORS.gold,
+			family: 'Arial'
+		});
+		hudLayer.addChild(coinHud);
+
+		function refreshUI() {
+			coinHud.text = `💰 ${coins}`;
+			woodStockT.text = wStock > 0 ? `🪵${wStock}` : '';
+			meatStockT.text = mStock > 0 ? `🥩${mStock}` : '';
+			woodLvT.text = `Lv${wLv}`;
+			meatLvT.text = `Lv${mLv}`;
+			pCarryT.text = carryText();
+			for (const b of btns) b.update();
+		}
+
+		// --- Click ---
+		clickArea.on('pointerdown', (e: any) => {
+			if (state !== 'playing') return;
+			const pos = e.getLocalPosition(world);
+			const wx = Math.max(10, Math.min(WW - 10, pos.x));
+
+			const nt = trees.find((t) => Math.abs(t.x - wx) < 25);
+			if (nt) {
+				P.tx = nt.x;
+				P.tgt = nt;
+				return;
+			}
+			const nb = beasts.find((b) => Math.abs(b.x - wx) < 25);
+			if (nb) {
+				P.tx = nb.x;
+				P.tgt = nb;
+				return;
+			}
+			P.tx = wx;
+			P.tgt = null;
+		});
+
+		// --- Initial spawns ---
 		for (let i = 0; i < 3; i++) spawnTree();
-		for (let i = 0; i < 2; i++) spawnAnimal();
+		for (let i = 0; i < 2; i++) spawnBeast();
 
-		// --- Game Loop ---
-		let autoTimer = 0;
+		let treeSpT = 0,
+			beastSpT = 0,
+			depositCD = 0,
+			pickupCD = 0;
 
+		function checkWin() {
+			if (wLv >= MAX_LV && mLv >= MAX_LV) state = 'win';
+		}
+
+		// --- Main Loop ---
 		app.ticker.add(() => {
+			if (state !== 'playing') return;
 			const dt = Math.min(app.ticker.deltaMS, 33);
 
 			// Snow
-			for (const s of snowflakes) {
-				s.y += s.speed;
-				s.x += s.drift;
-				if (s.y > GROUND_Y) { s.y = -5; s.x = Math.random() * W; }
-				if (s.x < 0) s.x = W;
-				if (s.x > W) s.x = 0;
-				s.gfx.x = s.x;
-				s.gfx.y = s.y;
+			for (const f of flakes) {
+				f.y += f.s;
+				f.x += f.d;
+				if (f.y > GY) {
+					f.y = -3;
+					f.x = Math.random() * WW;
+				}
+				if (f.x < 0) f.x = WW;
+				if (f.x > WW) f.x = 0;
+				f.g.x = f.x;
+				f.g.y = f.y;
 			}
 
-			// Spawn trees
-			treeSpawnTimer += dt;
-			if (treeSpawnTimer > 3000 && trees.length < 4) {
-				treeSpawnTimer = 0;
-				spawnTree();
+			// Chase target
+			if (P.tgt) {
+				if (P.tgt.c.destroyed) {
+					P.tgt = null;
+				} else {
+					P.tx = P.tgt.x;
+				}
 			}
 
-			// Spawn animals
-			animalSpawnTimer += dt;
-			if (animalSpawnTimer > 4000 && animals.length < 3) {
-				animalSpawnTimer = 0;
-				spawnAnimal();
+			// Movement
+			const dx = P.tx - P.x;
+			const inRange = P.tgt && Math.abs(P.x - P.tgt.x) < 30;
+			if (Math.abs(dx) > 3 && !inRange) {
+				P.x += Math.sign(dx) * SPD;
+				P.face = dx > 0 ? 1 : -1;
+				P.walkT++;
+			} else {
+				P.walkT = 0;
 			}
 
-			// Move animals
-			for (const a of animals) {
-				a.moveTimer -= dt;
-				if (a.moveTimer <= 0) {
-					a.vx = (Math.random() - 0.5) * 1;
-					a.moveTimer = 1000 + Math.random() * 2000;
+			// Attack
+			P.atkT -= dt;
+			if (inRange && P.tgt && P.atkT <= 0) {
+				P.atkT = ACD;
+				if ('vx' in P.tgt) hitBeast(P.tgt as Beast);
+				else hitTree(P.tgt as Tree);
+			}
+
+			// Player visual
+			pC.x = P.x;
+			pBody.scale.x = P.face;
+			const sw = Math.sin(P.walkT * 0.3) * 4;
+			pLL.y = sw;
+			pRL.y = -sw;
+
+			// Camera
+			world.x = -Math.max(0, Math.min(WW - W, P.x - W / 2));
+
+			// Drops physics
+			for (const d of drops) {
+				if (d.flying || d.landed) continue;
+				d.vy += 0.15;
+				d.y += d.vy;
+				if (d.y >= GY - 5) {
+					d.y = GY - 5;
+					d.vy = -d.vy * 0.3;
+					if (Math.abs(d.vy) < 0.5) {
+						d.landed = true;
+						d.vy = 0;
+					}
+				}
+				d.gfx.x = d.x;
+				d.gfx.y = d.y;
+			}
+
+			// Pickup
+			pickupCD -= dt;
+			if (pickupCD <= 0) {
+				for (const d of [...drops]) {
+					if (d.flying || !d.landed) continue;
+					if (Math.abs(d.x - P.x) > PR) continue;
+					if (d.type === 'coin') {
+						pickupCD = 80;
+						flyTo(d, P.x, GY - 25, () => {
+							coins++;
+							rmDrop(d);
+							refreshUI();
+						});
+						break;
+					} else {
+						if (P.carry.length >= CAP) continue;
+						pickupCD = 100;
+						const tp = d.type as IType;
+						flyTo(d, P.x, GY - 25, () => {
+							P.carry.push(tp);
+							rmDrop(d);
+							refreshUI();
+						});
+						break;
+					}
+				}
+			}
+
+			// Auto-deposit
+			depositCD -= dt;
+			if (depositCD <= 0) {
+				if (Math.abs(P.x - ZX.woodStn) < DR) {
+					const wi = P.carry.indexOf('wood');
+					if (wi >= 0) {
+						depositCD = 150;
+						P.carry.splice(wi, 1);
+						const g = mkGfx('wood');
+						g.x = P.x;
+						g.y = GY - 15;
+						itemLayer.addChild(g);
+						const tmp: Drop = {
+							type: 'wood',
+							x: P.x,
+							y: GY - 15,
+							gfx: g,
+							vy: 0,
+							landed: true,
+							flying: false
+						};
+						flyTo(tmp, ZX.woodStn, GY - 20, () => {
+							wStock++;
+							g.destroy();
+							refreshUI();
+						});
+					}
+				}
+				if (Math.abs(P.x - ZX.meatStn) < DR) {
+					const mi = P.carry.indexOf('meat');
+					if (mi >= 0) {
+						depositCD = 150;
+						P.carry.splice(mi, 1);
+						const g = mkGfx('meat');
+						g.x = P.x;
+						g.y = GY - 15;
+						itemLayer.addChild(g);
+						const tmp: Drop = {
+							type: 'meat',
+							x: P.x,
+							y: GY - 15,
+							gfx: g,
+							vy: 0,
+							landed: true,
+							flying: false
+						};
+						flyTo(tmp, ZX.meatStn, GY - 20, () => {
+							mStock++;
+							g.destroy();
+							refreshUI();
+						});
+					}
+				}
+			}
+
+			// Station production
+			if (wStock > 0) {
+				wProdT += dt;
+				if (wProdT >= prodMs(wLv, wWorker)) {
+					wProdT = 0;
+					wStock--;
+					spawnDrop('coin', ZX.woodStn, GY - 30);
+					refreshUI();
+				}
+			} else {
+				wProdT = 0;
+			}
+			if (mStock > 0) {
+				mProdT += dt;
+				if (mProdT >= prodMs(mLv, mWorker)) {
+					mProdT = 0;
+					mStock--;
+					spawnDrop('coin', ZX.meatStn, GY - 30);
+					refreshUI();
+				}
+			} else {
+				mProdT = 0;
+			}
+
+			// Animals wander
+			for (const a of beasts) {
+				a.mt -= dt;
+				if (a.mt <= 0) {
+					a.vx = (Math.random() - 0.5) * 0.6;
+					a.mt = 1500 + Math.random() * 2000;
 				}
 				a.x += a.vx;
-				a.x = Math.max(ANIMAL_AREA_X, Math.min(ANIMAL_AREA_X + ANIMAL_AREA_W, a.x));
-				if (!a.gfx.destroyed) a.gfx.x = a.x;
+				a.x = Math.max(ZX.hunt - HSPAN + 10, Math.min(ZX.hunt + HSPAN - 10, a.x));
+				if (!a.c.destroyed) a.c.x = a.x;
 			}
 
-			// Auto-generation from camp
-			autoTimer += dt;
-			if (autoTimer > 2000 && autoRate() > 0) {
-				autoTimer = 0;
-				wood += autoRate();
-				meat += Math.floor(autoRate() * 0.7);
-				updateHUD();
-				updateShop();
-
-				const autoPopup = centeredText(
-					`+${autoRate()}🪵 +${Math.floor(autoRate() * 0.7)}🥩`,
-					CAMP_X, CAMP_Y - 60,
-					{ size: 12, color: COLORS.cyan, family: 'Arial' }
-				);
-				app.stage.addChild(autoPopup);
-				let at = 0;
-				const atick = () => {
-					at += 0.02;
-					autoPopup.y -= 0.8;
-					autoPopup.alpha = 1 - at;
-					if (at >= 1) { app.ticker.remove(atick); autoPopup.destroy(); }
-				};
-				app.ticker.add(atick);
+			// Spawn
+			treeSpT += dt;
+			if (treeSpT > 4000 && trees.length < 4) {
+				treeSpT = 0;
+				spawnTree();
 			}
+			beastSpT += dt;
+			if (beastSpT > 5000 && beasts.length < 3) {
+				beastSpT = 0;
+				spawnBeast();
+			}
+
+			// Auto workers
+			if (hasCutter) {
+				cutterT += dt;
+				if (cutterT > 2000 && trees.length > 0) {
+					cutterT = 0;
+					hitTree(trees[Math.floor(Math.random() * trees.length)]);
+				}
+			}
+			if (hasHunter) {
+				hunterT += dt;
+				if (hunterT > 2500 && beasts.length > 0) {
+					hunterT = 0;
+					hitBeast(beasts[Math.floor(Math.random() * beasts.length)]);
+				}
+			}
+
+			refreshUI();
 		});
 
-		updateHUD();
-		updateShop();
-
+		refreshUI();
 		cleanup = appCleanup;
 	}
 
@@ -691,7 +841,7 @@
 <GameShell title="末日生存" onrestart={restart}>
 	<div class="game-container" bind:this={containerEl}></div>
 
-	{#if state === 'maxed'}
+	{#if state === 'win'}
 		<div class="overlay">
 			<div class="overlay-box win">
 				<p>全部滿級！</p>
@@ -734,8 +884,15 @@
 		margin-bottom: 1rem;
 	}
 
-	.win p { color: #00f0ff; text-shadow: 0 0 20px rgba(0, 240, 255, 0.5); }
-	.sub { font-size: 1rem !important; color: #ffe156; }
+	.win p {
+		color: #00f0ff;
+		text-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+	}
+
+	.sub {
+		font-size: 1rem !important;
+		color: #ffe156;
+	}
 
 	.overlay-box button {
 		font-family: 'Audiowide', sans-serif;
