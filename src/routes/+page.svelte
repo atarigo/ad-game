@@ -9,13 +9,13 @@
 
 <svelte:head>
 	<title>Ad Game — 假廣告遊戲集合</title>
-	<meta name="description" content="這些遊戲我在哪看過呢？" />
+	<meta name="description" content="這些遊戲我好像在哪看過耶！" />
 </svelte:head>
 
 <main>
 	<section class="hero">
 		<h1 class="glitch" data-text="AD GAME">AD GAME</h1>
-		<p class="tagline">這些遊戲我在哪看過呢？</p>
+		<p class="tagline">這些遊戲我好像在哪看過耶！</p>
 	</section>
 
 	<section class="games">
@@ -143,21 +143,21 @@
 	.game-card {
 		display: block;
 		padding: 1.2rem 1.5rem;
-		border: 1px solid rgba(0, 240, 255, 0.25);
+		border: 1px solid rgba(180, 160, 130, 0.2);
 		border-radius: 8px;
-		background: rgba(0, 240, 255, 0.04);
+		background: rgba(180, 160, 130, 0.05);
 		transition: border-color 0.2s, box-shadow 0.2s;
 	}
 
 	.game-card:hover:not(.disabled) {
-		border-color: var(--neon-cyan);
-		box-shadow: 0 0 16px rgba(0, 240, 255, 0.15);
+		border-color: rgba(200, 175, 140, 0.4);
+		box-shadow: 0 0 16px rgba(180, 120, 60, 0.1);
 	}
 
 	.game-card.disabled {
-		opacity: 0.4;
+		opacity: 0.35;
 		cursor: default;
-		border-color: rgba(255, 255, 255, 0.1);
+		border-color: rgba(180, 160, 130, 0.08);
 	}
 
 	.game-name {

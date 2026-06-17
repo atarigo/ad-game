@@ -37,7 +37,7 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		background: linear-gradient(180deg, #0a0a12 0%, #1a0a2e 100%);
+		background: linear-gradient(180deg, var(--bg-dark, #111315) 0%, var(--bg-purple, #1c1e22) 100%);
 		overflow: hidden;
 		padding-bottom: env(safe-area-inset-bottom, 0px);
 	}
@@ -54,13 +54,14 @@
 
 	.back {
 		font-size: 0.85rem;
-		color: var(--neon-cyan, #00f0ff);
+		color: #6cb8d6;
 		text-decoration: none;
 		white-space: nowrap;
 	}
 
 	.back:hover {
-		text-shadow: 0 0 8px rgba(0, 240, 255, 0.6);
+		color: #88ccee;
+		text-shadow: 0 0 10px rgba(108, 184, 214, 0.4);
 	}
 
 	.title {
