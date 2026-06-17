@@ -4,13 +4,14 @@ import ImageIO
 import UniformTypeIdentifiers
 
 let args = CommandLine.arguments
-guard args.count == 3 else {
-    fputs("usage: swift slice_survival_hero_actions.swift <sheet.png> <out-dir>\n", stderr)
+guard args.count == 3 || args.count == 4 else {
+    fputs("usage: swift slice_survival_hero_actions.swift <sheet.png> <out-dir> [prefix]\n", stderr)
     exit(2)
 }
 
 let sourceURL = URL(fileURLWithPath: args[1])
 let outDir = URL(fileURLWithPath: args[2], isDirectory: true)
+let prefix = args.count == 4 ? args[3] : "hero"
 
 guard
     let source = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
@@ -175,7 +176,7 @@ for row in 0..<rows {
             exit(1)
         }
 
-        let name = "hero-\(directions[row])-\(frames[col]).png"
+        let name = "\(prefix)-\(directions[row])-\(frames[col]).png"
         let url = outDir.appendingPathComponent(name)
         guard writePNG(finalImage, to: url) else {
             fputs("failed to write \(name)\n", stderr)
