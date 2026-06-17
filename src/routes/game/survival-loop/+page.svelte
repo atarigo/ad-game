@@ -28,7 +28,7 @@
 		const WW = 420;
 		const WH = 700;
 		const SPD = 4.5;
-		const CAP = 20;
+		const CAP = 50;
 		const ACD = 350;
 		const WORK_FRAME_MS = 180;
 		const WORK_ANIM_MS = 360;
@@ -991,7 +991,7 @@
 					if (dd.flying || !dd.landed) continue;
 					if (dist(dd.x, dd.y, P.x, P.y) > PR) continue;
 					const typeCount = P.carry.filter(function (c) { return c === dd.type; }).length;
-					const typeCap = dd.type === 'coin' ? 50 : CAP;
+					const typeCap = dd.type === 'coin' ? 500 : CAP;
 					if (typeCount >= typeCap) continue;
 					pickupCD = 80;
 					const tp = dd.type as IType;
@@ -1081,7 +1081,7 @@
 				if (bentoProdT >= 1200) {
 					bentoProdT = 0;
 					coins--;
-					bentoStock++;
+					bentoStock++; score += 10;
 					popup('+🍱', BENTO.x, BENTO.y - 30, COLORS.white);
 					if (bentoWk && bentoWk.hunger === 'working') {
 						bentoWk.workCount++;
