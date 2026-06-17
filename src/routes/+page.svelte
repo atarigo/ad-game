@@ -43,7 +43,7 @@
 		{/if}
 	</section>
 	<a href="/records" class="records-link">📋 成績記錄</a>
-	<span class="version">v0.2.0</span>
+	<span class="version">v0.2.1</span>
 </main>
 
 <style>
