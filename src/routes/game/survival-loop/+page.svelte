@@ -53,7 +53,7 @@
 
 		// 2D zone positions (compact, shifted down for HUD clearance)
 		const FOREST = { x: 100, y: 200, r: 80 };
-		const HUNT = { x: 320, y: 200, r: 80 };
+		const HUNT = { x: 320, y: 200, r: 110 };
 		const WSTN = { x: 85, y: 380 };
 		const MSTN = { x: 335, y: 380 };
 		const BENTO = { x: 210, y: 510 };
@@ -146,7 +146,7 @@
 
 		// Zone labels
 		zoneLayer.addChild(centeredText('🌲森林', FOREST.x, FOREST.y - FOREST.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
-		zoneLayer.addChild(centeredText('🎯獵場', HUNT.x, HUNT.y - HUNT.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
+		zoneLayer.addChild(centeredText('🐻獵場', HUNT.x, HUNT.y - HUNT.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
 
 		// Stock & level displays
 		const wStockT = centeredText('', WSTN.x, WSTN.y - 28, { size: 11, color: COLORS.yellow, family: 'Arial' });
@@ -166,11 +166,12 @@
 		type IType = 'wood' | 'meat' | 'coin';
 		interface Drop { type: IType | 'coin'; x: number; y: number; gfx: Graphics; vy: number; bounceY: number; landed: boolean; flying: boolean }
 		interface Tree { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics }
-		interface Beast { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number; walkT: number; hitT: number }
+		interface Beast { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number; walkT: number; hitT: number; atkCD: number }
 
 		const drops: Drop[] = [];
 		const trees: Tree[] = [];
 		const beasts: Beast[] = [];
+		const stumps: Sprite[] = [];
 
 		let coins = 0;
 		let wStock = 0, wLv = 1, wProdT = 0;
@@ -191,12 +192,13 @@
 			face: number; dir: PlayerDir; walkT: number;
 			workCount: number; hunger: HState;
 			tgt: Tree | Beast | null; atkT: number;
+			hp: number; maxHp: number; hpBar: Graphics;
 		}
 		const allWk: Wk[] = [];
 		let wStnWk: Wk | null = null;
 		let mStnWk: Wk | null = null;
 		let cutterWk: Wk | null = null;
-		let hunterWk: Wk | null = null;
+		const hunterWks: Wk[] = [];
 		let bentoWk: Wk | null = null;
 
 		function ucost(lv: number) { return Math.floor(8 * Math.pow(1.6, lv - 1)); }
@@ -209,7 +211,8 @@
 			carry: [] as IType[],
 			face: 1, atkT: 0, walkT: 0,
 			dir: 'down' as PlayerDir,
-			tgt: null as Tree | Beast | null
+			tgt: null as Tree | Beast | null,
+			hp: 100, maxHp: 100, invT: 0
 		};
 
 		const pC = new Container();
@@ -237,6 +240,9 @@
 		const pSprite = makeSprite('heroIdle', 48, 58, 0.86);
 		pBody.addChild(pSprite);
 		pShadow.visible = pLL.visible = pRL.visible = pTorso.visible = pHead.visible = pEye.visible = false;
+
+		const pHpBar = new Graphics();
+		pC.addChild(pHpBar);
 
 		const pCarryC = new Container();
 		pC.addChild(pCarryC);
@@ -384,6 +390,8 @@
 				stump.y = t.y;
 				stump.zIndex = t.y - 1;
 				objLayer.addChild(stump);
+				stumps.push(stump);
+				if (stumps.length > 8) { const old = stumps.shift(); if (old && !old.destroyed) old.destroy(); }
 				t.c.destroy();
 				trees.splice(trees.indexOf(t), 1);
 				statTrees++; score += 10;
@@ -401,7 +409,7 @@
 			const radius = Math.random() * (HUNT.r - 15);
 			const x = HUNT.x + Math.cos(angle) * radius;
 			const y = HUNT.y + Math.sin(angle) * radius;
-			const max = 8 + Math.floor(Math.random() * 4);
+			const max = 16 + Math.floor(Math.random() * 6);
 			const c = new Container();
 			c.x = x;
 			c.y = y;
@@ -416,14 +424,14 @@
 			for (const lx of [-10, -3, 5, 12]) legs.rect(lx, -2, 4, 10).fill(0x3d332b);
 			c.addChild(legs);
 			sh.visible = body.visible = head.visible = snout.visible = eye.visible = legs.visible = false;
-			const sprite = makeSprite('boarIdle', 58, 42, 0.82);
+			const sprite = makeSprite('boarIdle', 72, 54, 0.82);
 			c.addChild(sprite);
 			// HP bar
 			const bar = new Graphics(); c.addChild(bar);
 			objLayer.addChild(c);
-			const b: Beast = { c, sprite, x, y, hp: max, max, bar, vx: (Math.random() - 0.5) * 0.5, vy2: (Math.random() - 0.5) * 0.5, mt: 1200 + Math.random() * 1500, walkT: 0, hitT: 0 };
+			const b: Beast = { c, sprite, x, y, hp: max, max, bar, vx: (Math.random() - 0.5) * 0.5, vy2: (Math.random() - 0.5) * 0.5, mt: 1200 + Math.random() * 1500, walkT: 0, hitT: 0, atkCD: 0 };
 			beasts.push(b);
-			hpBar(bar, max, max, 0, -28, COLORS.red);
+			hpBar(bar, max, max, 0, -36, COLORS.red);
 		}
 
 		function hitBeast(b: Beast) {
@@ -440,7 +448,47 @@
 				const n = 2 + Math.floor(Math.random() * 2);
 				for (let i = 0; i < n; i++) spawnDrop('meat', b.x, b.y);
 			} else {
-				hpBar(b.bar, b.hp, b.max, 0, -28, COLORS.red);
+				hpBar(b.bar, b.hp, b.max, 0, -36, COLORS.red);
+			}
+		}
+
+		function hitPlayerByBeast(dmg: number) {
+			if (P.invT > 0) return;
+			P.hp -= dmg;
+			popup('-' + dmg, P.x, P.y - 45, COLORS.red);
+			if (P.hp <= 0) {
+				P.hp = 0;
+				playerDie();
+			}
+		}
+
+		function playerDie() {
+			for (let i = 0; i < P.carry.length; i++) {
+				spawnDrop(P.carry[i], P.x + (Math.random() - 0.5) * 20, P.y + (Math.random() - 0.5) * 20);
+			}
+			P.carry = [];
+			P.x = BENTO.x; P.y = BENTO.y + 60;
+			P.tx = P.x; P.ty = P.y;
+			P.tgt = null;
+			P.hp = P.maxHp;
+			P.invT = 1500;
+			popup('💀復活！', BENTO.x, BENTO.y + 30, COLORS.yellow);
+			refreshUI();
+		}
+
+		function hitHunterByBeast(wk: Wk, dmg: number) {
+			wk.hp -= dmg;
+			popup('-' + dmg, wk.x, wk.y - 35, COLORS.red);
+			wk.c.x = wk.x + (Math.random() - 0.5) * 5;
+			setTimeout(function () { if (!wk.c.destroyed) wk.c.x = wk.x; }, 80);
+			if (wk.hp <= 0) {
+				wk.c.destroy();
+				const idx = allWk.indexOf(wk);
+				if (idx >= 0) allWk.splice(idx, 1);
+				const hi = hunterWks.indexOf(wk); if (hi >= 0) hunterWks.splice(hi, 1);
+				popup('💀獵人陣亡', wk.x, wk.y - 50, COLORS.red);
+			} else {
+				hpBar(wk.hpBar, wk.hp, wk.maxHp, 0, -52, COLORS.green);
 			}
 		}
 
@@ -457,7 +505,11 @@
 			const sprite = makeSprite(kind === 'lumber' ? 'lumberIdle' : kind === 'hunter' ? 'hunterIdle' : 'clerkIdle', 36, 46, 0.86);
 			c.addChild(sprite);
 			charLayer.addChild(c);
-			const wk: Wk = { c, sprite, kind, x, y, homeX: x, homeY: y, face: 1, dir: 'down', walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0 };
+			const wkHp = kind === 'hunter' ? 60 : 0;
+			const hpG = new Graphics();
+			c.addChild(hpG);
+			if (kind === 'hunter') hpBar(hpG, wkHp, wkHp, 0, -52, COLORS.green);
+			const wk: Wk = { c, sprite, kind, x, y, homeX: x, homeY: y, face: 1, dir: 'down', walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0, hp: wkHp, maxHp: wkHp, hpBar: hpG };
 			allWk.push(wk);
 			return wk;
 		}
@@ -550,9 +602,9 @@
 		);
 		mkBtn(
 			function () { return '雇用獵人 🍱1'; },
-			function () { return pNearM() && !hunterWk; },
+			function () { return pNearM() && hunterWks.length < 2; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); hunterWk = spawnWk(HUNT.x, HUNT.y + 30, 'hunter'); hunterWk.homeX = HUNT.x; hunterWk.homeY = HUNT.y + 30; popup('+🏹', MSTN.x, MSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); const ox = hunterWks.length === 0 ? 0 : 20; const hw = spawnWk(HUNT.x + ox, HUNT.y + 30, 'hunter'); hw.homeX = HUNT.x + ox; hw.homeY = HUNT.y + 30; hunterWks.push(hw); popup('+🏹', MSTN.x, MSTN.y - 30, COLORS.green); },
 			H - 95
 		);
 		mkBtn(
@@ -851,6 +903,8 @@
 				timer += dt;
 			}
 
+			if (P.invT > 0) P.invT -= dt;
+
 			// --- Input: keyboard / joystick / tap ---
 			let inputDx = 0, inputDy = 0;
 			let directInput = false;
@@ -956,6 +1010,8 @@
 				pSprite.texture = heroTexture('idle');
 			}
 			pSprite.y = moving ? Math.sin(P.walkT * 0.35) * 2 : 0;
+			pC.alpha = P.invT > 0 ? (Math.floor(P.invT / 100) % 2 === 0 ? 0.3 : 1) : 1;
+			hpBar(pHpBar, P.hp, P.maxHp, 0, -58, P.hp > P.maxHp * 0.3 ? COLORS.green : COLORS.red);
 			const sw = Math.sin(P.walkT * 0.3) * 3;
 			pLL.y = sw;
 			pRL.y = -sw;
@@ -1091,27 +1147,80 @@
 				}
 			} else { bentoProdT = 0; }
 
-			// Animals wander (2D)
+			// Bears AI (aggro + wander)
 			for (let i = 0; i < beasts.length; i++) {
 				const a = beasts[i];
-				a.mt -= dt;
-				if (a.mt <= 0) {
-					a.vx = (Math.random() - 0.5) * 0.5;
-					a.vy2 = (Math.random() - 0.5) * 0.5;
-					a.mt = 1500 + Math.random() * 2000;
-				}
-				a.x += a.vx * tf;
-				a.y += a.vy2 * tf;
-				a.walkT += Math.abs(a.vx) + Math.abs(a.vy2) > 0.05 ? tf : 0;
 				a.hitT -= dt;
+				a.atkCD -= dt;
+
+				const AGGRO_R = 70;
+				const ATK_R = 25;
+				const BEAR_SPD = 1.8;
+				const BEAR_DMG = 5;
+				const BEAR_ACD = 800;
+				let aggroX = 0, aggroY = 0;
+				let hasAggro = false;
+				let aggroIsPlayer = false;
+				let aggroWk: Wk | null = null;
+
+				const dP = dist(a.x, a.y, P.x, P.y);
+				let dH = Infinity;
+				let closestHunter: Wk | null = null;
+				for (let hi = 0; hi < hunterWks.length; hi++) {
+					if (!hunterWks[hi].c.destroyed) {
+						const hd = dist(a.x, a.y, hunterWks[hi].x, hunterWks[hi].y);
+						if (hd < dH) { dH = hd; closestHunter = hunterWks[hi]; }
+					}
+				}
+
+				if (dP < AGGRO_R || dH < AGGRO_R) {
+					if (dist(a.x, a.y, HUNT.x, HUNT.y) < HUNT.r + 40) {
+						if (dP <= dH) {
+							aggroX = P.x; aggroY = P.y; hasAggro = true; aggroIsPlayer = true;
+						} else if (closestHunter) {
+							aggroX = closestHunter.x; aggroY = closestHunter.y; hasAggro = true; aggroWk = closestHunter;
+						}
+					}
+				}
+
+				if (hasAggro) {
+					const ddx = aggroX - a.x, ddy = aggroY - a.y;
+					const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+					if (dd > ATK_R) {
+						a.x += (ddx / dd) * BEAR_SPD * tf;
+						a.y += (ddy / dd) * BEAR_SPD * tf;
+					}
+					if (dd <= ATK_R && a.atkCD <= 0) {
+						a.atkCD = BEAR_ACD;
+						if (aggroIsPlayer) hitPlayerByBeast(BEAR_DMG);
+						else if (aggroWk) hitHunterByBeast(aggroWk, BEAR_DMG);
+					}
+					a.walkT += tf;
+				} else {
+					const homeDist = dist(a.x, a.y, HUNT.x, HUNT.y);
+					if (homeDist > HUNT.r - 10) {
+						const ddx = HUNT.x - a.x, ddy = HUNT.y - a.y;
+						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
+						a.x += (ddx / dd) * 1.5 * tf;
+						a.y += (ddy / dd) * 1.5 * tf;
+						a.walkT += tf;
+					} else {
+						a.mt -= dt;
+						if (a.mt <= 0) {
+							a.vx = (Math.random() - 0.5) * 0.5;
+							a.vy2 = (Math.random() - 0.5) * 0.5;
+							a.mt = 1500 + Math.random() * 2000;
+						}
+						a.x += a.vx * tf;
+						a.y += a.vy2 * tf;
+						a.walkT += Math.abs(a.vx) + Math.abs(a.vy2) > 0.05 ? tf : 0;
+					}
+				}
+
 				if (a.hitT > 0) {
 					a.sprite.texture = tex.boarHit;
 				} else {
 					a.sprite.texture = tex[Math.floor(a.walkT / 18) % 2 === 0 ? 'boarWalk1' : 'boarWalk2'];
-				}
-				if (dist(a.x, a.y, HUNT.x, HUNT.y) > HUNT.r - 10) {
-					a.vx *= -1; a.vy2 *= -1;
-					a.x += a.vx * 2 * tf; a.y += a.vy2 * 2 * tf;
 				}
 				if (!a.c.destroyed) { a.c.x = a.x; a.c.y = a.y; a.c.zIndex = a.y; }
 			}
@@ -1120,7 +1229,7 @@
 			treeSpT += dt;
 			if (treeSpT > 2500 && trees.length < 5) { treeSpT = 0; spawnTree(); }
 			beastSpT += dt;
-			if (beastSpT > 3000 && beasts.length < 3) { beastSpT = 0; spawnBeast(); }
+			if (beastSpT > 1000 && beasts.length < 8) { beastSpT = 0; spawnBeast(); }
 
 			// --- Unified worker AI ---
 			for (let wi = 0; wi < allWk.length; wi++) {
@@ -1188,7 +1297,7 @@
 					}
 
 					// Hunter AI
-					if (wk === hunterWk) {
+					if (hunterWks.indexOf(wk) >= 0) {
 						if (wk.tgt && (wk.tgt as Beast).c.destroyed) wk.tgt = null;
 						if (!wk.tgt && beasts.length > 0) {
 							let best: Beast | null = null, bd = Infinity;
@@ -1271,7 +1380,7 @@
 				<p class="title">時間到！</p>
 				<div class="stats">
 					<div class="stat-row"><span>🌲 砍倒木頭</span><span>{resultData.trees}</span></div>
-					<div class="stat-row"><span>🥩 獵殺動物</span><span>{resultData.animals}</span></div>
+					<div class="stat-row"><span>🐻 獵殺熊</span><span>{resultData.animals}</span></div>
 					<div class="stat-row"><span>💰 產出金幣</span><span>{resultData.coins}</span></div>
 					<div class="stat-row total"><span>🏆 總分</span><span>{resultData.score}</span></div>
 				</div>
