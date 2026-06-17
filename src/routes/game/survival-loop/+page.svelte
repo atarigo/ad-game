@@ -282,7 +282,7 @@
 			const spacing = 32;
 			const totalW = parts.length * spacing;
 			for (let i = 0; i < parts.length; i++) {
-				const t = centeredText(parts[i], -totalW / 2 + spacing / 2 + i * spacing, -34, { size: 10, color: COLORS.yellow, family: 'Arial' });
+				const t = centeredText(parts[i], -totalW / 2 + spacing / 2 + i * spacing, -68, { size: 10, color: COLORS.yellow, family: 'Arial' });
 				pCarryC.addChild(t);
 			}
 		}
