@@ -125,7 +125,7 @@
 		zoneMark(BENTO.x, BENTO.y, 0x8a7a3a);
 
 		// --- Station visuals ---
-		function makeStn(x: number, y: number, emoji: string, label: string, key: SurvivalSpriteKey) {
+		function makeStn(x: number, y: number, label: string, key: SurvivalSpriteKey) {
 			const c = new Container();
 			c.x = x;
 			c.y = y;
@@ -136,13 +136,12 @@
 			base.visible = false;
 			c.addChild(base);
 			c.addChild(makeSprite(key, 74, 64, 0.78));
-			c.addChild(centeredText(emoji, 0, -8, { size: 18, family: 'Arial' }));
 			zoneLayer.addChild(c);
 			zoneLayer.addChild(centeredText(label, x, y + 28, { size: 10, color: COLORS.muted, family: 'Arial' }));
 		}
-		makeStn(WSTN.x, WSTN.y, '🪵', '木材站', 'woodStation');
-		makeStn(MSTN.x, MSTN.y, '🥩', '肉品站', 'meatStation');
-		makeStn(BENTO.x, BENTO.y, '🍱', '便當店', 'mealShop');
+		makeStn(WSTN.x, WSTN.y, '木材站', 'woodStation');
+		makeStn(MSTN.x, MSTN.y, '肉品站', 'meatStation');
+		makeStn(BENTO.x, BENTO.y, '便當店', 'mealShop');
 
 		// Zone labels
 		zoneLayer.addChild(centeredText('🌲森林', FOREST.x, FOREST.y - FOREST.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
