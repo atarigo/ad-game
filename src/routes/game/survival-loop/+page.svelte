@@ -16,10 +16,12 @@
 
 	let containerEl: HTMLDivElement;
 	let cleanup: (() => void) | undefined;
-	let state = $state<'playing' | 'result'>('playing');
+	let state = $state<'menu' | 'playing' | 'result'>('menu');
+	let gameMode = $state<'normal' | 'infinite'>('normal');
 	let resultData = $state({ trees: 0, animals: 0, coins: 0, score: 0 });
 
-	async function startGame() {
+	async function startGame(mode: 'normal' | 'infinite') {
+		gameMode = mode;
 		if (cleanup) cleanup();
 		containerEl.innerHTML = '';
 		state = 'playing';
@@ -176,7 +178,7 @@
 		let bentoStock = 0, bentoProdT = 0;
 
 		const GAME_TIME = 180000;
-		let timer = GAME_TIME;
+		let timer = mode === 'normal' ? GAME_TIME : 0;
 		let score = 0;
 		let statTrees = 0, statBeasts = 0, statCoins = 0;
 
@@ -583,11 +585,11 @@
 		hudLayer.addChild(scoreHud);
 
 		function refreshUI() {
-			const sec = Math.max(0, Math.ceil(timer / 1000));
+			const sec = mode === 'normal' ? Math.max(0, Math.ceil(timer / 1000)) : Math.floor(timer / 1000);
 			const m = Math.floor(sec / 60);
 			const s = sec % 60;
 			timerHud.text = m + ':' + (s < 10 ? '0' : '') + s;
-			if (sec <= 10) timerHud.style.fill = COLORS.red;
+			if (mode === 'normal' && sec <= 10) timerHud.style.fill = COLORS.red;
 			scoreHud.text = '🏆 ' + score;
 			wStockT.text = wStock > 0 ? '🪵' + wStock : '';
 			mStockT.text = mStock > 0 ? '🥩' + mStock : '';
@@ -842,8 +844,12 @@
 			const tf = dt / 16.67;
 
 			// Timer
-			timer -= dt;
-			if (timer <= 0) { timer = 0; refreshUI(); endGame(); return; }
+			if (mode === 'normal') {
+				timer -= dt;
+				if (timer <= 0) { timer = 0; refreshUI(); endGame(); return; }
+			} else {
+				timer += dt;
+			}
 
 			// --- Input: keyboard / joystick / tap ---
 			let inputDx = 0, inputDy = 0;
@@ -1233,12 +1239,31 @@
 		};
 	}
 
-	function restart() { startGame(); }
-	onMount(function () { startGame(); return function () { if (cleanup) cleanup(); }; });
+	function restart() { if (cleanup) cleanup(); state = 'menu'; }
+	function selectMode(mode: 'normal' | 'infinite') { startGame(mode); }
+	onMount(function () { return function () { if (cleanup) cleanup(); }; });
 </script>
 
 <GameShell title="末日生存" onrestart={restart}>
 	<div class="game-container" bind:this={containerEl}></div>
+
+	{#if state === 'menu'}
+		<div class="menu-overlay">
+			<div class="menu-box">
+				<p class="menu-title">末日生存</p>
+				<div class="menu-modes">
+					<button class="menu-mode" onclick={() => selectMode('normal')}>
+						<span class="menu-mode-name">一般模式</span>
+						<span class="menu-mode-desc">3 分鐘限時挑戰</span>
+					</button>
+					<button class="menu-mode" onclick={() => selectMode('infinite')}>
+						<span class="menu-mode-name">無限模式</span>
+						<span class="menu-mode-desc">無時間限制</span>
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	{#if state === 'result'}
 		<div class="overlay">
@@ -1329,5 +1354,72 @@
 
 	.overlay-box button:hover {
 		background: rgba(255, 225, 86, 0.15);
+	}
+
+	.menu-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(12, 12, 14, 0.85);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+	}
+
+	.menu-box {
+		text-align: center;
+		padding: 2rem 3rem;
+		border-radius: 12px;
+		background: #1c1e22;
+		border: 1px solid rgba(180, 160, 130, 0.12);
+		box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+	}
+
+	.menu-title {
+		font-family: 'Audiowide', sans-serif;
+		font-size: 1.8rem;
+		color: var(--neon-pink, #c4956a);
+		text-shadow: 0 0 8px rgba(196, 149, 106, 0.5);
+		margin: 0 0 1.5rem;
+	}
+
+	.menu-modes {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.menu-mode {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.3rem;
+		padding: 1rem 2.5rem;
+		border: 1px solid rgba(180, 160, 130, 0.25);
+		background: rgba(180, 160, 130, 0.06);
+		border-radius: 8px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.menu-mode:hover {
+		background: rgba(180, 160, 130, 0.14);
+		border-color: rgba(200, 175, 140, 0.4);
+	}
+
+	.menu-mode:active {
+		background: rgba(180, 160, 130, 0.2);
+	}
+
+	.menu-mode-name {
+		font-family: 'Audiowide', sans-serif;
+		font-size: 1.1rem;
+		color: #d4cfc8;
+	}
+
+	.menu-mode-desc {
+		font-family: 'Arial', sans-serif;
+		font-size: 0.8rem;
+		color: #706b63;
 	}
 </style>
