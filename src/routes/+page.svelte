@@ -42,6 +42,7 @@
 			</ul>
 		{/if}
 	</section>
+	<a href="/records" class="records-link">📋 成績記錄</a>
 	<span class="version">v0.2.0</span>
 </main>
 
@@ -172,6 +173,21 @@
 		margin-top: 0.3rem;
 		font-size: 0.85rem;
 		color: var(--text-muted);
+	}
+
+	.records-link {
+		font-family: 'Audiowide', sans-serif;
+		font-size: 0.95rem;
+		color: var(--neon-cyan);
+		border: 1px solid rgba(180, 160, 130, 0.2);
+		padding: 0.6rem 1.5rem;
+		border-radius: 8px;
+		transition: border-color 0.2s, box-shadow 0.2s;
+	}
+
+	.records-link:hover {
+		border-color: rgba(200, 175, 140, 0.4);
+		box-shadow: 0 0 12px rgba(180, 120, 60, 0.1);
 	}
 
 	.version {
