@@ -601,28 +601,19 @@
 
 		function setWorkerTexture(wk: Wk) {
 			const prefix = wk.kind === 'lumber' ? 'lumber' : wk.kind === 'hunter' ? 'hunter' : 'clerk';
-			if (wk.kind === 'clerk') {
-				const dir = wk.dir[0].toUpperCase() + wk.dir.slice(1);
-				if (wk.hunger === 'working' && wk.walkT === 0) {
-					wk.sprite.texture = tex[`clerk${dir}Work${Math.floor(timer / 300) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
-					return;
-				}
-				if (wk.walkT > 0) {
-					wk.sprite.texture = tex[`clerk${dir}Walk${Math.floor(wk.walkT / 10) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
-					return;
-				}
-				wk.sprite.texture = tex[`clerk${dir}Idle` as SurvivalSpriteKey];
-				return;
-			}
-			if (wk.hunger === 'working' && wk.walkT === 0 && (wk === cutterWk || wk === hunterWk) && wk.atkT > ACD - WORK_ANIM_MS) {
-				wk.sprite.texture = tex[`${prefix}Work${Math.floor(wk.atkT / WORK_FRAME_MS) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+			const dir = wk.dir[0].toUpperCase() + wk.dir.slice(1);
+			if (wk.hunger === 'working' && wk.walkT === 0) {
+				const workFrame = wk.kind === 'clerk'
+					? Math.floor(timer / 300) % 2 + 1
+					: Math.floor(wk.atkT / WORK_FRAME_MS) % 2 + 1;
+				wk.sprite.texture = tex[`${prefix}${dir}Work${workFrame}` as SurvivalSpriteKey];
 				return;
 			}
 			if (wk.walkT > 0) {
-				wk.sprite.texture = tex[`${prefix}Walk${Math.floor(wk.walkT / 10) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+				wk.sprite.texture = tex[`${prefix}${dir}Walk${Math.floor(wk.walkT / 10) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
 				return;
 			}
-			wk.sprite.texture = tex[`${prefix}Idle` as SurvivalSpriteKey];
+			wk.sprite.texture = tex[`${prefix}${dir}Idle` as SurvivalSpriteKey];
 		}
 
 		// --- Keyboard ---
@@ -1227,7 +1218,7 @@
 				}
 
 				wk.c.x = wk.x; wk.c.y = wk.y; wk.c.zIndex = wk.y;
-				wk.c.scale.x = wk.kind === 'clerk' ? 1 : wk.face;
+				wk.c.scale.x = 1;
 				setWorkerTexture(wk);
 			}
 

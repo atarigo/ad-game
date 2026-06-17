@@ -54,11 +54,51 @@ import lumberWalk1 from "$lib/assets/survival-loop/lumber-walk1.png?url";
 import lumberWalk2 from "$lib/assets/survival-loop/lumber-walk2.png?url";
 import lumberWork1 from "$lib/assets/survival-loop/lumber-work1.png?url";
 import lumberWork2 from "$lib/assets/survival-loop/lumber-work2.png?url";
+import lumberDownIdle from "$lib/assets/survival-loop/lumber-down-idle.png?url";
+import lumberDownWalk1 from "$lib/assets/survival-loop/lumber-down-walk1.png?url";
+import lumberDownWalk2 from "$lib/assets/survival-loop/lumber-down-walk2.png?url";
+import lumberDownWork1 from "$lib/assets/survival-loop/lumber-down-work1.png?url";
+import lumberDownWork2 from "$lib/assets/survival-loop/lumber-down-work2.png?url";
+import lumberUpIdle from "$lib/assets/survival-loop/lumber-up-idle.png?url";
+import lumberUpWalk1 from "$lib/assets/survival-loop/lumber-up-walk1.png?url";
+import lumberUpWalk2 from "$lib/assets/survival-loop/lumber-up-walk2.png?url";
+import lumberUpWork1 from "$lib/assets/survival-loop/lumber-up-work1.png?url";
+import lumberUpWork2 from "$lib/assets/survival-loop/lumber-up-work2.png?url";
+import lumberRightIdle from "$lib/assets/survival-loop/lumber-right-idle.png?url";
+import lumberRightWalk1 from "$lib/assets/survival-loop/lumber-right-walk1.png?url";
+import lumberRightWalk2 from "$lib/assets/survival-loop/lumber-right-walk2.png?url";
+import lumberRightWork1 from "$lib/assets/survival-loop/lumber-right-work1.png?url";
+import lumberRightWork2 from "$lib/assets/survival-loop/lumber-right-work2.png?url";
+import lumberLeftIdle from "$lib/assets/survival-loop/lumber-left-idle.png?url";
+import lumberLeftWalk1 from "$lib/assets/survival-loop/lumber-left-walk1.png?url";
+import lumberLeftWalk2 from "$lib/assets/survival-loop/lumber-left-walk2.png?url";
+import lumberLeftWork1 from "$lib/assets/survival-loop/lumber-left-work1.png?url";
+import lumberLeftWork2 from "$lib/assets/survival-loop/lumber-left-work2.png?url";
 import hunterIdle from "$lib/assets/survival-loop/hunter-idle.png?url";
 import hunterWalk1 from "$lib/assets/survival-loop/hunter-walk1.png?url";
 import hunterWalk2 from "$lib/assets/survival-loop/hunter-walk2.png?url";
 import hunterWork1 from "$lib/assets/survival-loop/hunter-work1.png?url";
 import hunterWork2 from "$lib/assets/survival-loop/hunter-work2.png?url";
+import hunterDownIdle from "$lib/assets/survival-loop/hunter-down-idle.png?url";
+import hunterDownWalk1 from "$lib/assets/survival-loop/hunter-down-walk1.png?url";
+import hunterDownWalk2 from "$lib/assets/survival-loop/hunter-down-walk2.png?url";
+import hunterDownWork1 from "$lib/assets/survival-loop/hunter-down-work1.png?url";
+import hunterDownWork2 from "$lib/assets/survival-loop/hunter-down-work2.png?url";
+import hunterUpIdle from "$lib/assets/survival-loop/hunter-up-idle.png?url";
+import hunterUpWalk1 from "$lib/assets/survival-loop/hunter-up-walk1.png?url";
+import hunterUpWalk2 from "$lib/assets/survival-loop/hunter-up-walk2.png?url";
+import hunterUpWork1 from "$lib/assets/survival-loop/hunter-up-work1.png?url";
+import hunterUpWork2 from "$lib/assets/survival-loop/hunter-up-work2.png?url";
+import hunterRightIdle from "$lib/assets/survival-loop/hunter-right-idle.png?url";
+import hunterRightWalk1 from "$lib/assets/survival-loop/hunter-right-walk1.png?url";
+import hunterRightWalk2 from "$lib/assets/survival-loop/hunter-right-walk2.png?url";
+import hunterRightWork1 from "$lib/assets/survival-loop/hunter-right-work1.png?url";
+import hunterRightWork2 from "$lib/assets/survival-loop/hunter-right-work2.png?url";
+import hunterLeftIdle from "$lib/assets/survival-loop/hunter-left-idle.png?url";
+import hunterLeftWalk1 from "$lib/assets/survival-loop/hunter-left-walk1.png?url";
+import hunterLeftWalk2 from "$lib/assets/survival-loop/hunter-left-walk2.png?url";
+import hunterLeftWork1 from "$lib/assets/survival-loop/hunter-left-work1.png?url";
+import hunterLeftWork2 from "$lib/assets/survival-loop/hunter-left-work2.png?url";
 import boarIdle from "$lib/assets/survival-loop/boar-idle.png?url";
 import boarWalk1 from "$lib/assets/survival-loop/boar-walk1.png?url";
 import boarWalk2 from "$lib/assets/survival-loop/boar-walk2.png?url";
@@ -128,11 +168,51 @@ export const survivalSpriteUrls = {
   lumberWalk2,
   lumberWork1,
   lumberWork2,
+  lumberDownIdle,
+  lumberDownWalk1,
+  lumberDownWalk2,
+  lumberDownWork1,
+  lumberDownWork2,
+  lumberUpIdle,
+  lumberUpWalk1,
+  lumberUpWalk2,
+  lumberUpWork1,
+  lumberUpWork2,
+  lumberRightIdle,
+  lumberRightWalk1,
+  lumberRightWalk2,
+  lumberRightWork1,
+  lumberRightWork2,
+  lumberLeftIdle,
+  lumberLeftWalk1,
+  lumberLeftWalk2,
+  lumberLeftWork1,
+  lumberLeftWork2,
   hunterIdle,
   hunterWalk1,
   hunterWalk2,
   hunterWork1,
   hunterWork2,
+  hunterDownIdle,
+  hunterDownWalk1,
+  hunterDownWalk2,
+  hunterDownWork1,
+  hunterDownWork2,
+  hunterUpIdle,
+  hunterUpWalk1,
+  hunterUpWalk2,
+  hunterUpWork1,
+  hunterUpWork2,
+  hunterRightIdle,
+  hunterRightWalk1,
+  hunterRightWalk2,
+  hunterRightWork1,
+  hunterRightWork2,
+  hunterLeftIdle,
+  hunterLeftWalk1,
+  hunterLeftWalk2,
+  hunterLeftWork1,
+  hunterLeftWork2,
   boarIdle,
   boarWalk1,
   boarWalk2,
