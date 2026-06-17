@@ -20,6 +20,7 @@
 	let state = $state<'menu' | 'playing' | 'result'>('menu');
 	let gameMode = $state<'normal' | 'infinite'>('normal');
 	let resultData = $state({ trees: 0, animals: 0, coins: 0, score: 0 });
+	let selectedGender = $state<'male' | 'female'>('male');
 
 	async function startGame(mode: 'normal' | 'infinite') {
 		gameMode = mode;
@@ -39,6 +40,7 @@
 		const HERO_ATTACK_ANIM_MS = 420;
 		const HERO_CHOP_FRAME_MS = 170;
 		const HERO_CHOP_ANIM_MS = 510;
+		const PLAYER_GENDER = selectedGender;
 		const PR = 45;
 		const DR = 55;
 		const DMG = 6;
@@ -153,8 +155,8 @@
 		makeStn(BENTO.x, BENTO.y, '便當店', 'mealShop');
 
 		// Zone labels
-		zoneLayer.addChild(centeredText('🌲森林', FOREST.x, FOREST.y - FOREST.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
-		zoneLayer.addChild(centeredText('🐻獵場', HUNT.x, HUNT.y - HUNT.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
+		zoneLayer.addChild(centeredText('森林', FOREST.x, FOREST.y - FOREST.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
+		zoneLayer.addChild(centeredText('獵場', HUNT.x, HUNT.y - HUNT.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
 
 		// Stock & level displays
 		const wStockT = centeredText('', WSTN.x, WSTN.y - 28, { size: 11, color: COLORS.yellow, family: 'Arial' });
@@ -194,8 +196,10 @@
 		// Unified worker system
 		type PlayerDir = 'down' | 'up' | 'left' | 'right';
 		type HState = 'working' | 'toEat' | 'eating' | 'returning';
+		type ClerkRole = 'bento' | 'wood' | 'meat';
 		interface Wk {
 			c: Container; sprite: Sprite; kind: 'clerk' | 'lumber' | 'hunter'; x: number; y: number;
+			clerkRole: ClerkRole;
 			homeX: number; homeY: number;
 			face: number; dir: PlayerDir; walkT: number;
 			workCount: number; hunger: HState;
@@ -245,7 +249,7 @@
 		const pEye = new Graphics(); pEye.circle(3, -20, 2).fill(0x222222);
 		pBody.addChild(pEye);
 
-		const pSprite = makeSprite('heroIdle', 48, 58, 0.86);
+		const pSprite = makeSprite('heroFemaleDownIdle', 48, 58, 0.86);
 		pBody.addChild(pSprite);
 		pShadow.visible = pLL.visible = pRL.visible = pTorso.visible = pHead.visible = pEye.visible = false;
 
@@ -270,6 +274,7 @@
 		}
 
 		function heroTexture(action: 'idle' | 'walk' | 'work' | 'chop' | 'attack', frame = 1) {
+			const gender = PLAYER_GENDER[0].toUpperCase() + PLAYER_GENDER.slice(1);
 			const dir = P.dir[0].toUpperCase() + P.dir.slice(1);
 			const suffix = action === 'idle'
 				? 'Idle'
@@ -280,7 +285,7 @@
 						: action === 'chop'
 							? `Chop${frame}`
 							: `Attack${frame}`;
-			return tex[`hero${dir}${suffix}` as SurvivalSpriteKey];
+			return tex[`hero${gender}${dir}${suffix}` as SurvivalSpriteKey];
 		}
 
 		function updateCarryVisual() {
@@ -505,11 +510,19 @@
 				popup('💀獵人陣亡', wk.x, wk.y - 50, COLORS.red);
 			} else {
 				hpBar(wk.hpBar, wk.hp, wk.maxHp, 0, -52, COLORS.green);
+				if (wk.hp <= wk.maxHp * 0.1 && wk.hunger === 'working') {
+					wk.tgt = null;
+					wk.hunger = 'toEat';
+				}
 			}
 		}
 
 		// --- Workers ---
-		function spawnWk(x: number, y: number, kind: 'clerk' | 'lumber' | 'hunter'): Wk {
+		function clerkPrefix(role: ClerkRole) {
+			return role === 'wood' ? 'clerkWood' : role === 'meat' ? 'clerkMeat' : 'clerk';
+		}
+
+		function spawnWk(x: number, y: number, kind: 'clerk' | 'lumber' | 'hunter', clerkRole: ClerkRole = 'bento'): Wk {
 			const c = new Container();
 			c.x = x; c.y = y; c.zIndex = y;
 			const fallbackColor = kind === 'lumber' ? 0x466548 : kind === 'hunter' ? 0x65543f : 0x5a5f63;
@@ -518,14 +531,14 @@
 			const hood = new Graphics(); hood.circle(0, -12, 7).fill(0x263845); c.addChild(hood);
 			const head = new Graphics(); head.circle(1, -11, 5).fill(0xd1a072); c.addChild(head);
 			sh.visible = body.visible = hood.visible = head.visible = false;
-			const sprite = makeSprite(kind === 'lumber' ? 'lumberIdle' : kind === 'hunter' ? 'hunterIdle' : 'clerkIdle', 36, 46, 0.86);
+			const sprite = makeSprite(kind === 'lumber' ? 'lumberDownIdle' : kind === 'hunter' ? 'hunterDownIdle' : `${clerkPrefix(clerkRole)}DownIdle` as SurvivalSpriteKey, 36, 46, 0.86);
 			c.addChild(sprite);
 			charLayer.addChild(c);
 			const wkHp = kind === 'hunter' ? 60 : 0;
 			const hpG = new Graphics();
 			c.addChild(hpG);
 			if (kind === 'hunter') hpBar(hpG, wkHp, wkHp, 0, -52, COLORS.green);
-			const wk: Wk = { c, sprite, kind, x, y, homeX: x, homeY: y, face: 1, dir: 'down', walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0, hp: wkHp, maxHp: wkHp, hpBar: hpG };
+			const wk: Wk = { c, sprite, kind, clerkRole, x, y, homeX: x, homeY: y, face: 1, dir: 'down', walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0, hp: wkHp, maxHp: wkHp, hpBar: hpG };
 			allWk.push(wk);
 			return wk;
 		}
@@ -550,16 +563,13 @@
 				.roundRect(-70, -15, 140, 30, 6)
 				.stroke({ color: COLORS.cyan, width: 1, alpha: 0.5 });
 			c.addChild(bg);
-			const idx = btns.length + 1;
-			const keyLabel = centeredText(String(idx), -58, 0, { size: 9, color: COLORS.muted, family: 'Arial' });
-			c.addChild(keyLabel);
-			const lbl = centeredText(getText(), 4, 0, { size: 11, color: COLORS.white, family: 'Arial' });
+			const lbl = centeredText(getText(), 0, 0, { size: 11, color: COLORS.white, family: 'Arial' });
 			c.addChild(lbl);
 			c.eventMode = 'static';
 			c.cursor = 'pointer';
 			c.visible = false;
 			function doTrigger() {
-				if (isOn()) { onClick(); refreshUI(); }
+				if (isOn()) { btnTapped = true; onClick(); refreshUI(); }
 			}
 			c.on('pointerdown', doTrigger);
 			hudLayer.addChild(c);
@@ -590,7 +600,7 @@
 			function () { return '雇用店員 🍱1'; },
 			function () { return pNearW() && !wStnWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); wStnWk = spawnWk(WSTN.x + 25, WSTN.y, 'clerk'); wStnWk.homeX = WSTN.x + 25; wStnWk.homeY = WSTN.y; popup('+👷', WSTN.x, WSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); wStnWk = spawnWk(WSTN.x + 25, WSTN.y, 'clerk', 'wood'); wStnWk.homeX = WSTN.x + 25; wStnWk.homeY = WSTN.y; popup('+👷', WSTN.x, WSTN.y - 30, COLORS.green); },
 			H - 55
 		);
 		mkBtn(
@@ -613,7 +623,7 @@
 			function () { return '雇用店員 🍱1'; },
 			function () { return pNearM() && !mStnWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); mStnWk = spawnWk(MSTN.x + 25, MSTN.y, 'clerk'); mStnWk.homeX = MSTN.x + 25; mStnWk.homeY = MSTN.y; popup('+👷', MSTN.x, MSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); mStnWk = spawnWk(MSTN.x + 25, MSTN.y, 'clerk', 'meat'); mStnWk.homeX = MSTN.x + 25; mStnWk.homeY = MSTN.y; popup('+👷', MSTN.x, MSTN.y - 30, COLORS.green); },
 			H - 55
 		);
 		mkBtn(
@@ -631,13 +641,20 @@
 			H - 135
 		);
 
-		// Bento shop button
+		// Bento shop buttons
+		mkBtn(
+			function () { return '吃便當 🍱1'; },
+			function () { return pNearB(); },
+			function () { return hasBentoStock() && P.hp < P.maxHp; },
+			function () { useBentoStock(); P.hp = P.maxHp; popup('+❤️', P.x, P.y - 65, COLORS.green); },
+			H - 55
+		);
 		mkBtn(
 			function () { return '雇用店員 🍱1'; },
 			function () { return pNearB() && !bentoWk; },
 			function () { return hasBentoStock(); },
 			function () { useBentoStock(); bentoWk = spawnWk(BENTO.x + 25, BENTO.y, 'clerk'); bentoWk.homeX = BENTO.x + 25; bentoWk.homeY = BENTO.y; popup('+👷', BENTO.x, BENTO.y - 30, COLORS.green); },
-			H - 55
+			H - 95
 		);
 
 		const allBtns = btns;
@@ -670,7 +687,7 @@
 		}
 
 		function setWorkerTexture(wk: Wk) {
-			const prefix = wk.kind === 'lumber' ? 'lumber' : wk.kind === 'hunter' ? 'hunter' : 'clerk';
+			const prefix = wk.kind === 'lumber' ? 'lumber' : wk.kind === 'hunter' ? 'hunter' : clerkPrefix(wk.clerkRole);
 			const dir = wk.dir[0].toUpperCase() + wk.dir.slice(1);
 			if (wk.hunger === 'working' && wk.walkT === 0) {
 				const workFrame = wk.kind === 'clerk'
@@ -810,9 +827,10 @@
 					const tdx = p.x - tapStartX;
 					const tdy = p.y - tapStartY;
 					if (elapsed < 300 && Math.sqrt(tdx * tdx + tdy * tdy) < 15) {
-						tapTarget(tapStartX, tapStartY);
+						if (!btnTapped) tapTarget(tapStartX, tapStartY);
 					}
 				}
+				btnTapped = false;
 				joyActive = false;
 				joyId = -1;
 				joyDx = 0;
@@ -884,9 +902,10 @@
 				const tdx = e.global.x - tapStartX;
 				const tdy = e.global.y - tapStartY;
 				if (elapsed < 300 && Math.sqrt(tdx * tdx + tdy * tdy) < 15) {
-					tapTarget(tapStartX, tapStartY);
+					if (!btnTapped) tapTarget(tapStartX, tapStartY);
 				}
 			}
+			btnTapped = false;
 			joyActive = false;
 			joyId = -1;
 			joyDx = 0;
@@ -899,6 +918,7 @@
 		for (let i = 0; i < 2; i++) spawnBeast();
 
 		let treeSpT = 0, beastSpT = 0, depositCD = 0, pickupCD = 0;
+		let btnTapped = false;
 
 		function endGame() {
 			resultData = { trees: statTrees, animals: statBeasts, coins: statCoins, score };
@@ -1145,11 +1165,12 @@
 			const mStnActive = (mStnWk && mStnWk.hunger === 'working') || dist(P.x, P.y, MSTN.x, MSTN.y) < DR;
 			if (mStock > 0 && mStnActive) {
 				mProdT += dt;
-				if (mProdT >= prodMs(mLv)) {
+				if (mProdT >= prodMs(mLv) * 1.538) {
 					mProdT = 0;
 					mStock--;
-					statCoins++; score += 10;
-					spawnDrop('coin', MSTN.x + 15, MSTN.y + 10);
+					statCoins += 2; score += 20;
+					spawnDrop('coin', MSTN.x - 10, MSTN.y + 10);
+					spawnDrop('coin', MSTN.x + 30, MSTN.y + 10);
 					if (mStnWk && mStnWk.hunger === 'working') {
 						mStnWk.workCount++;
 						if (mStnWk.workCount >= 5) mStnWk.hunger = 'toEat';
@@ -1282,7 +1303,17 @@
 					} else { wk.hunger = 'eating'; wk.walkT = 0; }
 
 				} else if (wk.hunger === 'eating') {
-					if (bentoStock > 0) { bentoStock--; wk.workCount = 0; wk.hunger = 'returning'; refreshUI(); }
+					if (bentoStock > 0) {
+						bentoStock--;
+						wk.workCount = 0;
+						if (wk.kind === 'hunter' && wk.hp < wk.maxHp) {
+							wk.hp = wk.maxHp;
+							hpBar(wk.hpBar, wk.hp, wk.maxHp, 0, -52, COLORS.green);
+							popup('+❤️', wk.x, wk.y - 50, COLORS.green);
+						}
+						wk.hunger = 'returning';
+						refreshUI();
+					}
 
 				} else if (wk.hunger === 'returning') {
 					const d2 = dist(wk.x, wk.y, wk.homeX, wk.homeY);
@@ -1385,6 +1416,7 @@
 
 	function restart() { if (cleanup) cleanup(); state = 'menu'; }
 	function selectMode(mode: 'normal' | 'infinite') { startGame(mode); }
+	function pickGender(g: 'male' | 'female') { selectedGender = g; }
 	onMount(function () { return function () { if (cleanup) cleanup(); }; });
 </script>
 
@@ -1395,6 +1427,22 @@
 		<div class="menu-overlay">
 			<div class="menu-box">
 				<p class="menu-title">末日生存</p>
+
+				<div class="char-pick">
+					<button class="char-card" class:selected={selectedGender === 'male'} onclick={() => pickGender('male')}>
+						<div class="char-frame">
+							<img src={survivalSpriteUrls.heroDownIdle} alt="男主角" class="char-img" />
+						</div>
+						<span class="char-name">ㄅ</span>
+					</button>
+					<button class="char-card" class:selected={selectedGender === 'female'} onclick={() => pickGender('female')}>
+						<div class="char-frame">
+							<img src={survivalSpriteUrls.heroFemaleDownIdle} alt="女主角" class="char-img" />
+						</div>
+						<span class="char-name">ㄆ</span>
+					</button>
+				</div>
+
 				<div class="menu-modes">
 					<button class="menu-mode" onclick={() => selectMode('normal')}>
 						<span class="menu-mode-name">一般模式</span>
@@ -1525,6 +1573,72 @@
 		color: var(--neon-pink, #c4956a);
 		text-shadow: 0 0 8px rgba(196, 149, 106, 0.5);
 		margin: 0 0 1.5rem;
+	}
+
+	/* --- Character Pick --- */
+
+	.char-pick {
+		display: flex;
+		justify-content: center;
+		gap: 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.char-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem;
+		border: 2px solid rgba(180, 160, 130, 0.15);
+		border-radius: 10px;
+		background: rgba(180, 160, 130, 0.04);
+		cursor: pointer;
+		transition: all 0.15s ease;
+	}
+
+	.char-card:hover {
+		border-color: rgba(200, 175, 140, 0.35);
+		background: rgba(180, 160, 130, 0.08);
+	}
+
+	.char-card.selected {
+		border-color: var(--neon-pink, #c4956a);
+		background: rgba(196, 149, 106, 0.1);
+		box-shadow: 0 0 12px rgba(196, 149, 106, 0.2);
+	}
+
+	.char-frame {
+		width: 64px;
+		height: 64px;
+		border: 1px solid rgba(180, 160, 130, 0.2);
+		border-radius: 8px;
+		background: rgba(0, 0, 0, 0.25);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		overflow: hidden;
+	}
+
+	.char-card.selected .char-frame {
+		border-color: rgba(196, 149, 106, 0.4);
+	}
+
+	.char-img {
+		width: 48px;
+		height: 48px;
+		image-rendering: pixelated;
+		object-fit: contain;
+	}
+
+	.char-name {
+		font-size: 1rem;
+		color: #706b63;
+		letter-spacing: 0.1em;
+	}
+
+	.char-card.selected .char-name {
+		color: var(--neon-pink, #c4956a);
 	}
 
 	.menu-modes {
