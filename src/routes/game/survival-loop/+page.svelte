@@ -166,7 +166,7 @@
 		type IType = 'wood' | 'meat' | 'coin';
 		interface Drop { type: IType | 'coin'; x: number; y: number; gfx: Graphics; vy: number; bounceY: number; landed: boolean; flying: boolean }
 		interface Tree { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics }
-		interface Beast { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number; walkT: number; hitT: number; atkCD: number }
+		interface Beast { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number; walkT: number; hitT: number; atkCD: number; attackT: number }
 
 		const drops: Drop[] = [];
 		const trees: Tree[] = [];
@@ -429,7 +429,7 @@
 			// HP bar
 			const bar = new Graphics(); c.addChild(bar);
 			objLayer.addChild(c);
-			const b: Beast = { c, sprite, x, y, hp: max, max, bar, vx: (Math.random() - 0.5) * 0.5, vy2: (Math.random() - 0.5) * 0.5, mt: 1200 + Math.random() * 1500, walkT: 0, hitT: 0, atkCD: 0 };
+			const b: Beast = { c, sprite, x, y, hp: max, max, bar, vx: (Math.random() - 0.5) * 0.5, vy2: (Math.random() - 0.5) * 0.5, mt: 1200 + Math.random() * 1500, walkT: 0, hitT: 0, atkCD: 0, attackT: 0 };
 			beasts.push(b);
 			hpBar(bar, max, max, 0, -36, COLORS.red);
 		}
@@ -1152,6 +1152,7 @@
 				const a = beasts[i];
 				a.hitT -= dt;
 				a.atkCD -= dt;
+				a.attackT -= dt;
 
 				const AGGRO_R = 70;
 				const ATK_R = 25;
@@ -1192,6 +1193,7 @@
 					}
 					if (dd <= ATK_R && a.atkCD <= 0) {
 						a.atkCD = BEAR_ACD;
+						a.attackT = 420;
 						if (aggroIsPlayer) hitPlayerByBeast(BEAR_DMG);
 						else if (aggroWk) hitHunterByBeast(aggroWk, BEAR_DMG);
 					}
@@ -1219,6 +1221,8 @@
 
 				if (a.hitT > 0) {
 					a.sprite.texture = tex.boarHit;
+				} else if (a.attackT > 0) {
+					a.sprite.texture = tex[a.attackT > 210 ? 'bearAttack1' : 'bearAttack2'];
 				} else {
 					a.sprite.texture = tex[Math.floor(a.walkT / 18) % 2 === 0 ? 'boarWalk1' : 'boarWalk2'];
 				}

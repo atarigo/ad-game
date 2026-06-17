@@ -103,6 +103,8 @@ import boarIdle from "$lib/assets/survival-loop/boar-idle.png?url";
 import boarWalk1 from "$lib/assets/survival-loop/boar-walk1.png?url";
 import boarWalk2 from "$lib/assets/survival-loop/boar-walk2.png?url";
 import boarHit from "$lib/assets/survival-loop/boar-hit.png?url";
+import bearAttack1 from "$lib/assets/survival-loop/bear-attack1.png?url";
+import bearAttack2 from "$lib/assets/survival-loop/bear-attack2.png?url";
 import treeFull from "$lib/assets/survival-loop/tree-full.png?url";
 import treeDamaged from "$lib/assets/survival-loop/tree-damaged.png?url";
 import treeStump from "$lib/assets/survival-loop/tree-stump.png?url";
@@ -217,6 +219,8 @@ export const survivalSpriteUrls = {
   boarWalk1,
   boarWalk2,
   boarHit,
+  bearAttack1,
+  bearAttack2,
   treeFull,
   treeDamaged,
   treeStump,
