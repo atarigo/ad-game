@@ -29,6 +29,26 @@ import clerkWalk1 from "$lib/assets/survival-loop/clerk-walk1.png?url";
 import clerkWalk2 from "$lib/assets/survival-loop/clerk-walk2.png?url";
 import clerkWork1 from "$lib/assets/survival-loop/clerk-work1.png?url";
 import clerkWork2 from "$lib/assets/survival-loop/clerk-work2.png?url";
+import clerkDownIdle from "$lib/assets/survival-loop/clerk-down-idle.png?url";
+import clerkDownWalk1 from "$lib/assets/survival-loop/clerk-down-walk1.png?url";
+import clerkDownWalk2 from "$lib/assets/survival-loop/clerk-down-walk2.png?url";
+import clerkDownWork1 from "$lib/assets/survival-loop/clerk-down-work1.png?url";
+import clerkDownWork2 from "$lib/assets/survival-loop/clerk-down-work2.png?url";
+import clerkUpIdle from "$lib/assets/survival-loop/clerk-up-idle.png?url";
+import clerkUpWalk1 from "$lib/assets/survival-loop/clerk-up-walk1.png?url";
+import clerkUpWalk2 from "$lib/assets/survival-loop/clerk-up-walk2.png?url";
+import clerkUpWork1 from "$lib/assets/survival-loop/clerk-up-work1.png?url";
+import clerkUpWork2 from "$lib/assets/survival-loop/clerk-up-work2.png?url";
+import clerkRightIdle from "$lib/assets/survival-loop/clerk-right-idle.png?url";
+import clerkRightWalk1 from "$lib/assets/survival-loop/clerk-right-walk1.png?url";
+import clerkRightWalk2 from "$lib/assets/survival-loop/clerk-right-walk2.png?url";
+import clerkRightWork1 from "$lib/assets/survival-loop/clerk-right-work1.png?url";
+import clerkRightWork2 from "$lib/assets/survival-loop/clerk-right-work2.png?url";
+import clerkLeftIdle from "$lib/assets/survival-loop/clerk-left-idle.png?url";
+import clerkLeftWalk1 from "$lib/assets/survival-loop/clerk-left-walk1.png?url";
+import clerkLeftWalk2 from "$lib/assets/survival-loop/clerk-left-walk2.png?url";
+import clerkLeftWork1 from "$lib/assets/survival-loop/clerk-left-work1.png?url";
+import clerkLeftWork2 from "$lib/assets/survival-loop/clerk-left-work2.png?url";
 import lumberIdle from "$lib/assets/survival-loop/lumber-idle.png?url";
 import lumberWalk1 from "$lib/assets/survival-loop/lumber-walk1.png?url";
 import lumberWalk2 from "$lib/assets/survival-loop/lumber-walk2.png?url";
@@ -83,6 +103,26 @@ export const survivalSpriteUrls = {
   clerkWalk2,
   clerkWork1,
   clerkWork2,
+  clerkDownIdle,
+  clerkDownWalk1,
+  clerkDownWalk2,
+  clerkDownWork1,
+  clerkDownWork2,
+  clerkUpIdle,
+  clerkUpWalk1,
+  clerkUpWalk2,
+  clerkUpWork1,
+  clerkUpWork2,
+  clerkRightIdle,
+  clerkRightWalk1,
+  clerkRightWalk2,
+  clerkRightWork1,
+  clerkRightWork2,
+  clerkLeftIdle,
+  clerkLeftWalk1,
+  clerkLeftWalk2,
+  clerkLeftWork1,
+  clerkLeftWork2,
   lumberIdle,
   lumberWalk1,
   lumberWalk2,

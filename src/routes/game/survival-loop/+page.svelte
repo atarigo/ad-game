@@ -186,7 +186,7 @@
 		interface Wk {
 			c: Container; sprite: Sprite; kind: 'clerk' | 'lumber' | 'hunter'; x: number; y: number;
 			homeX: number; homeY: number;
-			face: number; walkT: number;
+			face: number; dir: PlayerDir; walkT: number;
 			workCount: number; hunger: HState;
 			tgt: Tree | Beast | null; atkT: number;
 		}
@@ -246,6 +246,11 @@
 			if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return;
 			if (Math.abs(dx) > Math.abs(dy)) P.dir = dx > 0 ? 'right' : 'left';
 			else P.dir = dy > 0 ? 'down' : 'up';
+		}
+
+		function moveDir(dx: number, dy: number): PlayerDir {
+			if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'right' : 'left';
+			return dy > 0 ? 'down' : 'up';
 		}
 
 		function heroTexture(action: 'idle' | 'walk' | 'work', frame = 1) {
@@ -450,7 +455,7 @@
 			const sprite = makeSprite(kind === 'lumber' ? 'lumberIdle' : kind === 'hunter' ? 'hunterIdle' : 'clerkIdle', 36, 46, 0.86);
 			c.addChild(sprite);
 			charLayer.addChild(c);
-			const wk: Wk = { c, sprite, kind, x, y, homeX: x, homeY: y, face: 1, walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0 };
+			const wk: Wk = { c, sprite, kind, x, y, homeX: x, homeY: y, face: 1, dir: 'down', walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0 };
 			allWk.push(wk);
 			return wk;
 		}
@@ -596,12 +601,21 @@
 
 		function setWorkerTexture(wk: Wk) {
 			const prefix = wk.kind === 'lumber' ? 'lumber' : wk.kind === 'hunter' ? 'hunter' : 'clerk';
-			if (wk.hunger === 'working' && wk.walkT === 0 && (wk === cutterWk || wk === hunterWk) && wk.atkT > ACD - WORK_ANIM_MS) {
-				wk.sprite.texture = tex[`${prefix}Work${Math.floor(wk.atkT / WORK_FRAME_MS) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+			if (wk.kind === 'clerk') {
+				const dir = wk.dir[0].toUpperCase() + wk.dir.slice(1);
+				if (wk.hunger === 'working' && wk.walkT === 0) {
+					wk.sprite.texture = tex[`clerk${dir}Work${Math.floor(timer / 300) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+					return;
+				}
+				if (wk.walkT > 0) {
+					wk.sprite.texture = tex[`clerk${dir}Walk${Math.floor(wk.walkT / 10) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+					return;
+				}
+				wk.sprite.texture = tex[`clerk${dir}Idle` as SurvivalSpriteKey];
 				return;
 			}
-			if (wk.kind === 'clerk' && wk.hunger === 'working' && wk.walkT === 0) {
-				wk.sprite.texture = tex[`clerkWork${Math.floor(timer / 300) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+			if (wk.hunger === 'working' && wk.walkT === 0 && (wk === cutterWk || wk === hunterWk) && wk.atkT > ACD - WORK_ANIM_MS) {
+				wk.sprite.texture = tex[`${prefix}Work${Math.floor(wk.atkT / WORK_FRAME_MS) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
 				return;
 			}
 			if (wk.walkT > 0) {
@@ -1122,6 +1136,7 @@
 						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
 						wk.x += (ddx / dd) * 2.5 * tf; wk.y += (ddy / dd) * 2.5 * tf;
 						if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+						wk.dir = moveDir(ddx, ddy);
 						wk.walkT++;
 					} else { wk.hunger = 'eating'; wk.walkT = 0; }
 
@@ -1135,6 +1150,7 @@
 						const dd = Math.sqrt(ddx * ddx + ddy * ddy);
 						wk.x += (ddx / dd) * 2.5 * tf; wk.y += (ddy / dd) * 2.5 * tf;
 						if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+						wk.dir = moveDir(ddx, ddy);
 						wk.walkT++;
 					} else { wk.hunger = 'working'; wk.walkT = 0; }
 
@@ -1157,6 +1173,7 @@
 								const dd = Math.sqrt(ddx * ddx + ddy * ddy);
 								wk.x += (ddx / dd) * 2 * tf; wk.y += (ddy / dd) * 2 * tf;
 								if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+								wk.dir = moveDir(ddx, ddy);
 								wk.walkT++;
 							} else {
 								wk.walkT = 0; wk.atkT -= dt;
@@ -1191,6 +1208,7 @@
 								const dd = Math.sqrt(ddx * ddx + ddy * ddy);
 								wk.x += (ddx / dd) * 2 * tf; wk.y += (ddy / dd) * 2 * tf;
 								if (Math.abs(ddx) > 0.5) wk.face = ddx > 0 ? 1 : -1;
+								wk.dir = moveDir(ddx, ddy);
 								wk.walkT++;
 							} else {
 								wk.walkT = 0; wk.atkT -= dt;
@@ -1209,7 +1227,7 @@
 				}
 
 				wk.c.x = wk.x; wk.c.y = wk.y; wk.c.zIndex = wk.y;
-				wk.c.scale.x = wk.face;
+				wk.c.scale.x = wk.kind === 'clerk' ? 1 : wk.face;
 				setWorkerTexture(wk);
 			}
 
