@@ -11,6 +11,8 @@
 		Container,
 		Text
 	} from '$lib/game-engine';
+	import { Assets, Sprite, Texture } from 'pixi.js';
+	import { survivalSpriteUrls, type SurvivalSpriteKey } from '$lib/survival-loop-assets';
 
 	let containerEl: HTMLDivElement;
 	let cleanup: (() => void) | undefined;
@@ -28,10 +30,24 @@
 		const SPD = 4.5;
 		const CAP = 20;
 		const ACD = 350;
+		const WORK_FRAME_MS = 180;
+		const WORK_ANIM_MS = 360;
 		const PR = 45;
 		const DR = 55;
 		const DMG = 6;
 		const MAX_LV = 10;
+		await Assets.load(Object.values(survivalSpriteUrls));
+		const tex = Object.fromEntries(Object.entries(survivalSpriteUrls).map(function ([key, url]) {
+			return [key, Texture.from(url)];
+		})) as Record<SurvivalSpriteKey, Texture>;
+
+		function makeSprite(key: SurvivalSpriteKey, width: number, height: number, anchorY = 0.82) {
+			const s = new Sprite(tex[key]);
+			s.anchor.set(0.5, anchorY);
+			s.width = width;
+			s.height = height;
+			return s;
+		}
 
 		// 2D zone positions (compact, shifted down for HUD clearance)
 		const FOREST = { x: 100, y: 200, r: 80 };
@@ -62,15 +78,27 @@
 		app.stage.addChild(hudLayer);
 
 		// --- Ground ---
-		const ground = new Graphics();
-		ground.rect(0, 0, WW, WH).fill(0x1a3a1a);
-		groundLayer.addChild(ground);
+		const groundFallback = new Graphics();
+		groundFallback.rect(0, 0, WW, WH).fill(0x26353a);
+		groundFallback.rect(0, 0, WW, 72).fill(0x27333d);
+		groundFallback.rect(20, 36, WW - 40, 6).fill({ color: 0x87979d, alpha: 0.8 });
+		groundFallback.circle(FOREST.x, FOREST.y, FOREST.r + 16).fill({ color: 0x263f38, alpha: 0.75 });
+		groundFallback.circle(HUNT.x, HUNT.y, HUNT.r + 16).fill({ color: 0x4a3a2c, alpha: 0.65 });
+		groundFallback.moveTo(40, 360).bezierCurveTo(120, 330, 300, 330, 380, 360).stroke({ color: 0xd9eef0, width: 18, alpha: 0.12 });
+		groundFallback.moveTo(65, 520).bezierCurveTo(145, 470, 280, 470, 355, 515).stroke({ color: 0xd9eef0, width: 22, alpha: 0.12 });
+		groundLayer.addChild(groundFallback);
+		const groundMap = new Sprite(tex.worldMap);
+		groundMap.x = 0;
+		groundMap.y = 0;
+		groundMap.width = WW;
+		groundMap.height = WH;
+		groundLayer.addChild(groundMap);
 		for (let i = 0; i < 25; i++) {
 			const patch = new Graphics();
 			const px = Math.random() * WW;
 			const py = Math.random() * WH;
 			const pr = 15 + Math.random() * 25;
-			patch.circle(px, py, pr).fill({ color: 0x153015, alpha: 0.4 });
+			patch.circle(px, py, pr).fill({ color: 0xd9eef0, alpha: 0.05 });
 			groundLayer.addChild(patch);
 		}
 
@@ -95,35 +123,24 @@
 		zoneMark(BENTO.x, BENTO.y, 0x8a7a3a);
 
 		// --- Station visuals ---
-		function makeStn(x: number, y: number, emoji: string, label: string, col: number) {
+		function makeStn(x: number, y: number, emoji: string, label: string, key: SurvivalSpriteKey) {
 			const c = new Container();
 			c.x = x;
 			c.y = y;
 			const base = new Graphics();
-			base.roundRect(-26, -16, 52, 32, 5).fill(col);
-			base.roundRect(-26, -16, 52, 32, 5).stroke({ color: 0x7a6a5a, width: 1 });
+			base.roundRect(-30, -23, 60, 42, 5).fill(key === 'meatStation' ? 0x54323a : key === 'mealShop' ? 0x5b4b32 : 0x564235);
+			base.roundRect(-34, -31, 68, 14, 3).fill(0x2f3b45);
+			base.roundRect(-30, -23, 60, 42, 5).stroke({ color: 0x7f8f95, width: 1, alpha: 0.45 });
+			base.visible = false;
 			c.addChild(base);
-			c.addChild(centeredText(emoji, 0, 0, { size: 20, family: 'Arial' }));
+			c.addChild(makeSprite(key, 74, 64, 0.78));
+			c.addChild(centeredText(emoji, 0, -8, { size: 18, family: 'Arial' }));
 			zoneLayer.addChild(c);
 			zoneLayer.addChild(centeredText(label, x, y + 28, { size: 10, color: COLORS.muted, family: 'Arial' }));
 		}
-		makeStn(WSTN.x, WSTN.y, '🪵', '木材站', 0x4a3a2a);
-		makeStn(MSTN.x, MSTN.y, '🥩', '肉品站', 0x4a2a2a);
-
-		// Bento shop
-		const shopC = new Container();
-		shopC.x = BENTO.x;
-		shopC.y = BENTO.y;
-		const shopBase = new Graphics();
-		shopBase.roundRect(-28, -20, 56, 40, 5).fill(0x4a3a2a);
-		shopBase.roundRect(-28, -20, 56, 40, 5).stroke({ color: 0x6a5a4a, width: 1 });
-		shopC.addChild(shopBase);
-		const shopRoof = new Graphics();
-		shopRoof.roundRect(-32, -28, 64, 12, 3).fill(0x8a2a1a);
-		shopC.addChild(shopRoof);
-		shopC.addChild(centeredText('🍱', 0, 2, { size: 20, family: 'Arial' }));
-		zoneLayer.addChild(shopC);
-		zoneLayer.addChild(centeredText('便當店', BENTO.x, BENTO.y + 30, { size: 10, color: COLORS.muted, family: 'Arial' }));
+		makeStn(WSTN.x, WSTN.y, '🪵', '木材站', 'woodStation');
+		makeStn(MSTN.x, MSTN.y, '🥩', '肉品站', 'meatStation');
+		makeStn(BENTO.x, BENTO.y, '🍱', '便當店', 'mealShop');
 
 		// Zone labels
 		zoneLayer.addChild(centeredText('🌲森林', FOREST.x, FOREST.y - FOREST.r - 12, { size: 11, color: COLORS.muted, family: 'Arial' }));
@@ -138,19 +155,6 @@
 		const bCoinT = centeredText('', BENTO.x + 20, BENTO.y - 38, { size: 11, color: COLORS.gold, family: 'Arial' });
 		zoneLayer.addChild(wStockT, mStockT, wLvT, mLvT, bStockT, bCoinT);
 
-		// --- Snow ---
-		interface Flake { g: Graphics; x: number; y: number; s: number; d: number }
-		const flakes: Flake[] = [];
-		for (let i = 0; i < 35; i++) {
-			const g = new Graphics();
-			g.circle(0, 0, 1 + Math.random() * 1.5).fill({ color: 0xffffff, alpha: 0.15 + Math.random() * 0.2 });
-			const f: Flake = { g, x: Math.random() * WW, y: Math.random() * WH, s: 0.3 + Math.random() * 0.5, d: (Math.random() - 0.5) * 0.3 };
-			g.x = f.x;
-			g.y = f.y;
-			snowLayer.addChild(g);
-			flakes.push(f);
-		}
-
 		// --- Click area ---
 		clickArea.rect(0, 0, WW, WH).fill({ color: 0x000000, alpha: 0.001 });
 		clickArea.eventMode = 'static';
@@ -159,8 +163,8 @@
 		// --- Game State ---
 		type IType = 'wood' | 'meat' | 'coin';
 		interface Drop { type: IType | 'coin'; x: number; y: number; gfx: Graphics; vy: number; bounceY: number; landed: boolean; flying: boolean }
-		interface Tree { c: Container; x: number; y: number; hp: number; max: number; bar: Graphics }
-		interface Beast { c: Container; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number }
+		interface Tree { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics }
+		interface Beast { c: Container; sprite: Sprite; x: number; y: number; hp: number; max: number; bar: Graphics; vx: number; vy2: number; mt: number; walkT: number; hitT: number }
 
 		const drops: Drop[] = [];
 		const trees: Tree[] = [];
@@ -177,9 +181,10 @@
 		let statTrees = 0, statBeasts = 0, statCoins = 0;
 
 		// Unified worker system
+		type PlayerDir = 'down' | 'up' | 'left' | 'right';
 		type HState = 'working' | 'toEat' | 'eating' | 'returning';
 		interface Wk {
-			c: Container; x: number; y: number;
+			c: Container; sprite: Sprite; kind: 'clerk' | 'lumber' | 'hunter'; x: number; y: number;
 			homeX: number; homeY: number;
 			face: number; walkT: number;
 			workCount: number; hunger: HState;
@@ -201,6 +206,7 @@
 			tx: BENTO.x, ty: BENTO.y + 60,
 			carry: [] as IType[],
 			face: 1, atkT: 0, walkT: 0,
+			dir: 'down' as PlayerDir,
 			tgt: null as Tree | Beast | null
 		};
 
@@ -226,11 +232,27 @@
 		const pEye = new Graphics(); pEye.circle(3, -20, 2).fill(0x222222);
 		pBody.addChild(pEye);
 
+		const pSprite = makeSprite('heroIdle', 48, 58, 0.86);
+		pBody.addChild(pSprite);
+		pShadow.visible = pLL.visible = pRL.visible = pTorso.visible = pHead.visible = pEye.visible = false;
+
 		const pCarryC = new Container();
 		pC.addChild(pCarryC);
 		pC.x = P.x;
 		pC.y = P.y;
 		charLayer.addChild(pC);
+
+		function setPlayerDir(dx: number, dy: number) {
+			if (Math.abs(dx) < 0.05 && Math.abs(dy) < 0.05) return;
+			if (Math.abs(dx) > Math.abs(dy)) P.dir = dx > 0 ? 'right' : 'left';
+			else P.dir = dy > 0 ? 'down' : 'up';
+		}
+
+		function heroTexture(action: 'idle' | 'walk' | 'work', frame = 1) {
+			const dir = P.dir[0].toUpperCase() + P.dir.slice(1);
+			const suffix = action === 'idle' ? 'Idle' : action === 'walk' ? `Walk${frame}` : `Work${frame}`;
+			return tex[`hero${dir}${suffix}` as SurvivalSpriteKey];
+		}
 
 		function updateCarryVisual() {
 			pCarryC.removeChildren();
@@ -317,20 +339,22 @@
 			c.x = x;
 			c.y = y;
 			c.zIndex = y;
-			// Shadow
+			// Geometry fallback keeps resources visible if image textures are not ready.
 			const sh = new Graphics(); sh.ellipse(0, 6, 18, 8).fill({ color: 0x000000, alpha: 0.2 }); c.addChild(sh);
-			// Trunk
-			const trunk = new Graphics(); trunk.rect(-5, -26, 10, 32).fill(0x6a4a2a); c.addChild(trunk);
-			// Canopy
+			const trunk = new Graphics(); trunk.rect(-5, -26, 10, 32).fill(0x6b4f35); c.addChild(trunk);
 			const canopy = new Graphics();
-			canopy.circle(0, -36, 22).fill(0x2a6a2a);
-			canopy.circle(-8, -28, 14).fill(0x3a7a3a);
-			canopy.circle(8, -28, 14).fill(0x2a5a2a);
+			canopy.circle(0, -36, 22).fill(0x496f67);
+			canopy.circle(-8, -28, 14).fill(0x3e625b);
+			canopy.circle(8, -28, 14).fill(0x334f4b);
+			canopy.moveTo(-16, -40).lineTo(16, -38).stroke({ color: 0xd7eef0, width: 3, alpha: 0.9 });
 			c.addChild(canopy);
+			sh.visible = trunk.visible = canopy.visible = false;
+			const sprite = makeSprite('treeFull', 62, 76, 0.9);
+			c.addChild(sprite);
 			// HP bar
 			const bar = new Graphics(); c.addChild(bar);
 			objLayer.addChild(c);
-			const tree: Tree = { c, x, y, hp: max, max, bar };
+			const tree: Tree = { c, sprite, x, y, hp: max, max, bar };
 			trees.push(tree);
 			hpBar(bar, max, max, 0, -62, COLORS.green);
 		}
@@ -348,12 +372,18 @@
 			setTimeout(function () { if (!t.c.destroyed) t.c.x = t.x; }, 80);
 			popup('-' + DMG, t.x, t.y - 65, COLORS.yellow);
 			if (t.hp <= 0) {
+				const stump = makeSprite('treeStump', 46, 36, 0.86);
+				stump.x = t.x;
+				stump.y = t.y;
+				stump.zIndex = t.y - 1;
+				objLayer.addChild(stump);
 				t.c.destroy();
 				trees.splice(trees.indexOf(t), 1);
 				statTrees++; score += 10;
 				const n = 2 + Math.floor(Math.random() * 2);
 				for (let i = 0; i < n; i++) spawnDrop('wood', t.x, t.y);
 			} else {
+				if (t.hp <= t.max / 2) t.sprite.texture = tex.treeDamaged;
 				hpBar(t.bar, t.hp, t.max, 0, -62, COLORS.green);
 			}
 		}
@@ -369,28 +399,30 @@
 			c.x = x;
 			c.y = y;
 			c.zIndex = y;
-			// Shadow
+			// Geometry fallback keeps prey visible if image textures are not ready.
 			const sh = new Graphics(); sh.ellipse(0, 4, 16, 7).fill({ color: 0x000000, alpha: 0.2 }); c.addChild(sh);
-			// Body
-			const body = new Graphics(); body.ellipse(0, -10, 18, 11).fill(0x8a6a4a); c.addChild(body);
-			// Head
-			const head = new Graphics(); head.circle(16, -15, 8).fill(0x7a5a3a); c.addChild(head);
-			// Eye
-			const eye = new Graphics(); eye.circle(20, -16, 2).fill(0xffffff); c.addChild(eye);
-			// Legs
+			const body = new Graphics(); body.ellipse(0, -10, 18, 11).fill(0x6f6257); c.addChild(body);
+			const head = new Graphics(); head.circle(16, -15, 8).fill(0x756555); c.addChild(head);
+			const snout = new Graphics(); snout.poly([22, -14, 30, -11, 22, -8]).fill(0xb9c1bf); c.addChild(snout);
+			const eye = new Graphics(); eye.circle(19, -17, 2).fill(0x071014); c.addChild(eye);
 			const legs = new Graphics();
-			for (const lx of [-10, -3, 5, 12]) legs.rect(lx, -2, 4, 10).fill(0x6a4a2a);
+			for (const lx of [-10, -3, 5, 12]) legs.rect(lx, -2, 4, 10).fill(0x3d332b);
 			c.addChild(legs);
+			sh.visible = body.visible = head.visible = snout.visible = eye.visible = legs.visible = false;
+			const sprite = makeSprite('boarIdle', 58, 42, 0.82);
+			c.addChild(sprite);
 			// HP bar
 			const bar = new Graphics(); c.addChild(bar);
 			objLayer.addChild(c);
-			const b: Beast = { c, x, y, hp: max, max, bar, vx: (Math.random() - 0.5) * 0.5, vy2: (Math.random() - 0.5) * 0.5, mt: 1200 + Math.random() * 1500 };
+			const b: Beast = { c, sprite, x, y, hp: max, max, bar, vx: (Math.random() - 0.5) * 0.5, vy2: (Math.random() - 0.5) * 0.5, mt: 1200 + Math.random() * 1500, walkT: 0, hitT: 0 };
 			beasts.push(b);
 			hpBar(bar, max, max, 0, -28, COLORS.red);
 		}
 
 		function hitBeast(b: Beast) {
 			b.hp -= DMG;
+			b.hitT = 220;
+			b.sprite.texture = tex.boarHit;
 			b.c.x = b.x + (Math.random() - 0.5) * 6;
 			setTimeout(function () { if (!b.c.destroyed) b.c.x = b.x; }, 80);
 			popup('-' + DMG, b.x, b.y - 32, COLORS.red);
@@ -406,14 +438,19 @@
 		}
 
 		// --- Workers ---
-		function spawnWk(x: number, y: number, col: number): Wk {
+		function spawnWk(x: number, y: number, kind: 'clerk' | 'lumber' | 'hunter'): Wk {
 			const c = new Container();
 			c.x = x; c.y = y; c.zIndex = y;
-			const sh = new Graphics(); sh.ellipse(0, 2, 7, 3).fill({ color: 0x000000, alpha: 0.2 }); c.addChild(sh);
-			const body = new Graphics(); body.rect(-4, -4, 8, 12).fill(col); c.addChild(body);
-			const head = new Graphics(); head.circle(0, -10, 5).fill(0xdda070); c.addChild(head);
+			const fallbackColor = kind === 'lumber' ? 0x466548 : kind === 'hunter' ? 0x65543f : 0x5a5f63;
+			const sh = new Graphics(); sh.ellipse(0, 2, 8, 4).fill({ color: 0x000000, alpha: 0.2 }); c.addChild(sh);
+			const body = new Graphics(); body.rect(-5, -5, 10, 14).fill(fallbackColor); c.addChild(body);
+			const hood = new Graphics(); hood.circle(0, -12, 7).fill(0x263845); c.addChild(hood);
+			const head = new Graphics(); head.circle(1, -11, 5).fill(0xd1a072); c.addChild(head);
+			sh.visible = body.visible = hood.visible = head.visible = false;
+			const sprite = makeSprite(kind === 'lumber' ? 'lumberIdle' : kind === 'hunter' ? 'hunterIdle' : 'clerkIdle', 36, 46, 0.86);
+			c.addChild(sprite);
 			charLayer.addChild(c);
-			const wk: Wk = { c, x, y, homeX: x, homeY: y, face: 1, walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0 };
+			const wk: Wk = { c, sprite, kind, x, y, homeX: x, homeY: y, face: 1, walkT: 0, workCount: 0, hunger: 'working', tgt: null, atkT: 0 };
 			allWk.push(wk);
 			return wk;
 		}
@@ -478,14 +515,14 @@
 			function () { return '雇用店員 🍱1'; },
 			function () { return pNearW() && !wStnWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); wStnWk = spawnWk(WSTN.x + 25, WSTN.y, 0x6a8a4a); wStnWk.homeX = WSTN.x + 25; wStnWk.homeY = WSTN.y; popup('+👷', WSTN.x, WSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); wStnWk = spawnWk(WSTN.x + 25, WSTN.y, 'clerk'); wStnWk.homeX = WSTN.x + 25; wStnWk.homeY = WSTN.y; popup('+👷', WSTN.x, WSTN.y - 30, COLORS.green); },
 			H - 55
 		);
 		mkBtn(
 			function () { return '雇用樵夫 🍱1'; },
 			function () { return pNearW() && !cutterWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); cutterWk = spawnWk(FOREST.x, FOREST.y + 30, 0x4a8a4a); cutterWk.homeX = FOREST.x; cutterWk.homeY = FOREST.y + 30; popup('+🪓', WSTN.x, WSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); cutterWk = spawnWk(FOREST.x, FOREST.y + 30, 'lumber'); cutterWk.homeX = FOREST.x; cutterWk.homeY = FOREST.y + 30; popup('+🪓', WSTN.x, WSTN.y - 30, COLORS.green); },
 			H - 95
 		);
 		mkBtn(
@@ -501,14 +538,14 @@
 			function () { return '雇用店員 🍱1'; },
 			function () { return pNearM() && !mStnWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); mStnWk = spawnWk(MSTN.x + 25, MSTN.y, 0x8a4a6a); mStnWk.homeX = MSTN.x + 25; mStnWk.homeY = MSTN.y; popup('+👷', MSTN.x, MSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); mStnWk = spawnWk(MSTN.x + 25, MSTN.y, 'clerk'); mStnWk.homeX = MSTN.x + 25; mStnWk.homeY = MSTN.y; popup('+👷', MSTN.x, MSTN.y - 30, COLORS.green); },
 			H - 55
 		);
 		mkBtn(
 			function () { return '雇用獵人 🍱1'; },
 			function () { return pNearM() && !hunterWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); hunterWk = spawnWk(HUNT.x, HUNT.y + 30, 0x8a6a4a); hunterWk.homeX = HUNT.x; hunterWk.homeY = HUNT.y + 30; popup('+🏹', MSTN.x, MSTN.y - 30, COLORS.green); },
+			function () { useBentoStock(); hunterWk = spawnWk(HUNT.x, HUNT.y + 30, 'hunter'); hunterWk.homeX = HUNT.x; hunterWk.homeY = HUNT.y + 30; popup('+🏹', MSTN.x, MSTN.y - 30, COLORS.green); },
 			H - 95
 		);
 		mkBtn(
@@ -524,7 +561,7 @@
 			function () { return '雇用店員 🍱1'; },
 			function () { return pNearB() && !bentoWk; },
 			function () { return hasBentoStock(); },
-			function () { useBentoStock(); bentoWk = spawnWk(BENTO.x + 25, BENTO.y, 0x8a7a4a); bentoWk.homeX = BENTO.x + 25; bentoWk.homeY = BENTO.y; popup('+👷', BENTO.x, BENTO.y - 30, COLORS.green); },
+			function () { useBentoStock(); bentoWk = spawnWk(BENTO.x + 25, BENTO.y, 'clerk'); bentoWk.homeX = BENTO.x + 25; bentoWk.homeY = BENTO.y; popup('+👷', BENTO.x, BENTO.y - 30, COLORS.green); },
 			H - 55
 		);
 
@@ -555,6 +592,23 @@
 			mLvT.text = 'Lv' + mLv;
 			updateCarryVisual();
 			for (let i = 0; i < allBtns.length; i++) allBtns[i].update();
+		}
+
+		function setWorkerTexture(wk: Wk) {
+			const prefix = wk.kind === 'lumber' ? 'lumber' : wk.kind === 'hunter' ? 'hunter' : 'clerk';
+			if (wk.hunger === 'working' && wk.walkT === 0 && (wk === cutterWk || wk === hunterWk) && wk.atkT > ACD - WORK_ANIM_MS) {
+				wk.sprite.texture = tex[`${prefix}Work${Math.floor(wk.atkT / WORK_FRAME_MS) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+				return;
+			}
+			if (wk.kind === 'clerk' && wk.hunger === 'working' && wk.walkT === 0) {
+				wk.sprite.texture = tex[`clerkWork${Math.floor(timer / 300) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+				return;
+			}
+			if (wk.walkT > 0) {
+				wk.sprite.texture = tex[`${prefix}Walk${Math.floor(wk.walkT / 10) % 2 === 0 ? 1 : 2}` as SurvivalSpriteKey];
+				return;
+			}
+			wk.sprite.texture = tex[`${prefix}Idle` as SurvivalSpriteKey];
 		}
 
 		// --- Keyboard ---
@@ -786,18 +840,6 @@
 			timer -= dt;
 			if (timer <= 0) { timer = 0; refreshUI(); endGame(); return; }
 
-			// Snow
-			for (let i = 0; i < flakes.length; i++) {
-				const f = flakes[i];
-				f.y += f.s * tf;
-				f.x += f.d * tf;
-				if (f.y > WH) { f.y = -3; f.x = Math.random() * WW; }
-				if (f.x < 0) f.x = WW;
-				if (f.x > WW) f.x = 0;
-				f.g.x = f.x;
-				f.g.y = f.y;
-			}
-
 			// --- Input: keyboard / joystick / tap ---
 			let inputDx = 0, inputDy = 0;
 			let directInput = false;
@@ -851,6 +893,7 @@
 				P.tx = P.x;
 				P.ty = P.y;
 				if (Math.abs(inputDx) > 0.1) P.face = inputDx > 0 ? 1 : -1;
+				setPlayerDir(inputDx, inputDy);
 				moving = true;
 				// Find nearest attackable in range
 				P.tgt = null;
@@ -870,6 +913,7 @@
 					P.x += (dx / d) * SPD * tf;
 					P.y += (dy / d) * SPD * tf;
 					if (Math.abs(dx) > 0.5) P.face = dx > 0 ? 1 : -1;
+					setPlayerDir(dx, dy);
 					moving = true;
 				}
 			}
@@ -884,12 +928,23 @@
 				if ('vx' in P.tgt) hitBeast(P.tgt as Beast);
 				else hitTree(P.tgt as Tree);
 			}
+			if (atkRange && P.tgt) setPlayerDir(P.tgt.x - P.x, P.tgt.y - P.y);
 
 			// Player visual
 			pC.x = P.x;
 			pC.y = P.y;
 			pC.zIndex = P.y;
-			pBody.scale.x = P.face;
+			pBody.scale.x = 1;
+			if (atkRange && P.tgt && P.atkT > ACD - WORK_ANIM_MS) {
+				const frame = Math.floor(P.atkT / WORK_FRAME_MS) % 2 === 0 ? 1 : 2;
+				pSprite.texture = heroTexture('work', frame);
+			} else if (moving) {
+				const frame = Math.floor(P.walkT / 8) % 2 === 0 ? 1 : 2;
+				pSprite.texture = heroTexture('walk', frame);
+			} else {
+				pSprite.texture = heroTexture('idle');
+			}
+			pSprite.y = moving ? Math.sin(P.walkT * 0.35) * 2 : 0;
 			const sw = Math.sin(P.walkT * 0.3) * 3;
 			pLL.y = sw;
 			pRL.y = -sw;
@@ -1036,6 +1091,13 @@
 				}
 				a.x += a.vx * tf;
 				a.y += a.vy2 * tf;
+				a.walkT += Math.abs(a.vx) + Math.abs(a.vy2) > 0.05 ? tf : 0;
+				a.hitT -= dt;
+				if (a.hitT > 0) {
+					a.sprite.texture = tex.boarHit;
+				} else {
+					a.sprite.texture = tex[Math.floor(a.walkT / 18) % 2 === 0 ? 'boarWalk1' : 'boarWalk2'];
+				}
 				if (dist(a.x, a.y, HUNT.x, HUNT.y) > HUNT.r - 10) {
 					a.vx *= -1; a.vy2 *= -1;
 					a.x += a.vx * 2 * tf; a.y += a.vy2 * 2 * tf;
@@ -1148,6 +1210,7 @@
 
 				wk.c.x = wk.x; wk.c.y = wk.y; wk.c.zIndex = wk.y;
 				wk.c.scale.x = wk.face;
+				setWorkerTexture(wk);
 			}
 
 			refreshUI();
