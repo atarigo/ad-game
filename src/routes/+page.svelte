@@ -42,7 +42,7 @@
 			</ul>
 		{/if}
 	</section>
-	<span class="version">v0.1.1</span>
+	<span class="version">v0.2.0</span>
 </main>
 
 <style>
