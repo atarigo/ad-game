@@ -1,17 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { getAllGames, getScores, gameNames, detailLabels, type ScoreRecord } from '$lib/scores';
+	import { getScores, gameNames, detailLabels, type ScoreRecord } from '$lib/scores';
 
+	const knownGames = Object.keys(gameNames);
 	let records = $state<Record<string, ScoreRecord[]>>({});
 	let hasAny = $state(false);
 
 	onMount(() => {
-		const slugs = getAllGames();
-		for (const slug of slugs) {
+		const data: Record<string, ScoreRecord[]> = {};
+		for (const slug of knownGames) {
 			const list = getScores(slug);
-			if (list.length > 0) records[slug] = list;
+			if (list.length > 0) data[slug] = list;
 		}
-		hasAny = Object.keys(records).length > 0;
+		records = data;
+		hasAny = Object.keys(data).length > 0;
 	});
 
 	function formatTime(iso: string): string {
