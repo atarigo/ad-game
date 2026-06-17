@@ -9,21 +9,45 @@ import heroDownWalk1 from "$lib/assets/survival-loop/hero-down-walk1.png?url";
 import heroDownWalk2 from "$lib/assets/survival-loop/hero-down-walk2.png?url";
 import heroDownWork1 from "$lib/assets/survival-loop/hero-down-work1.png?url";
 import heroDownWork2 from "$lib/assets/survival-loop/hero-down-work2.png?url";
+import heroDownChop1 from "$lib/assets/survival-loop/hero-down-chop1.png?url";
+import heroDownChop2 from "$lib/assets/survival-loop/hero-down-chop2.png?url";
+import heroDownChop3 from "$lib/assets/survival-loop/hero-down-chop3.png?url";
+import heroDownAttack1 from "$lib/assets/survival-loop/hero-down-attack1.png?url";
+import heroDownAttack2 from "$lib/assets/survival-loop/hero-down-attack2.png?url";
+import heroDownAttack3 from "$lib/assets/survival-loop/hero-down-attack3.png?url";
 import heroUpIdle from "$lib/assets/survival-loop/hero-up-idle.png?url";
 import heroUpWalk1 from "$lib/assets/survival-loop/hero-up-walk1.png?url";
 import heroUpWalk2 from "$lib/assets/survival-loop/hero-up-walk2.png?url";
 import heroUpWork1 from "$lib/assets/survival-loop/hero-up-work1.png?url";
 import heroUpWork2 from "$lib/assets/survival-loop/hero-up-work2.png?url";
+import heroUpChop1 from "$lib/assets/survival-loop/hero-up-chop1.png?url";
+import heroUpChop2 from "$lib/assets/survival-loop/hero-up-chop2.png?url";
+import heroUpChop3 from "$lib/assets/survival-loop/hero-up-chop3.png?url";
+import heroUpAttack1 from "$lib/assets/survival-loop/hero-up-attack1.png?url";
+import heroUpAttack2 from "$lib/assets/survival-loop/hero-up-attack2.png?url";
+import heroUpAttack3 from "$lib/assets/survival-loop/hero-up-attack3.png?url";
 import heroRightIdle from "$lib/assets/survival-loop/hero-right-idle.png?url";
 import heroRightWalk1 from "$lib/assets/survival-loop/hero-right-walk1.png?url";
 import heroRightWalk2 from "$lib/assets/survival-loop/hero-right-walk2.png?url";
 import heroRightWork1 from "$lib/assets/survival-loop/hero-right-work1.png?url";
 import heroRightWork2 from "$lib/assets/survival-loop/hero-right-work2.png?url";
+import heroRightChop1 from "$lib/assets/survival-loop/hero-right-chop1.png?url";
+import heroRightChop2 from "$lib/assets/survival-loop/hero-right-chop2.png?url";
+import heroRightChop3 from "$lib/assets/survival-loop/hero-right-chop3.png?url";
+import heroRightAttack1 from "$lib/assets/survival-loop/hero-right-attack1.png?url";
+import heroRightAttack2 from "$lib/assets/survival-loop/hero-right-attack2.png?url";
+import heroRightAttack3 from "$lib/assets/survival-loop/hero-right-attack3.png?url";
 import heroLeftIdle from "$lib/assets/survival-loop/hero-left-idle.png?url";
 import heroLeftWalk1 from "$lib/assets/survival-loop/hero-left-walk1.png?url";
 import heroLeftWalk2 from "$lib/assets/survival-loop/hero-left-walk2.png?url";
 import heroLeftWork1 from "$lib/assets/survival-loop/hero-left-work1.png?url";
 import heroLeftWork2 from "$lib/assets/survival-loop/hero-left-work2.png?url";
+import heroLeftChop1 from "$lib/assets/survival-loop/hero-left-chop1.png?url";
+import heroLeftChop2 from "$lib/assets/survival-loop/hero-left-chop2.png?url";
+import heroLeftChop3 from "$lib/assets/survival-loop/hero-left-chop3.png?url";
+import heroLeftAttack1 from "$lib/assets/survival-loop/hero-left-attack1.png?url";
+import heroLeftAttack2 from "$lib/assets/survival-loop/hero-left-attack2.png?url";
+import heroLeftAttack3 from "$lib/assets/survival-loop/hero-left-attack3.png?url";
 import clerkIdle from "$lib/assets/survival-loop/clerk-idle.png?url";
 import clerkWalk1 from "$lib/assets/survival-loop/clerk-walk1.png?url";
 import clerkWalk2 from "$lib/assets/survival-loop/clerk-walk2.png?url";
@@ -125,21 +149,45 @@ export const survivalSpriteUrls = {
   heroDownWalk2,
   heroDownWork1,
   heroDownWork2,
+  heroDownChop1,
+  heroDownChop2,
+  heroDownChop3,
+  heroDownAttack1,
+  heroDownAttack2,
+  heroDownAttack3,
   heroUpIdle,
   heroUpWalk1,
   heroUpWalk2,
   heroUpWork1,
   heroUpWork2,
+  heroUpChop1,
+  heroUpChop2,
+  heroUpChop3,
+  heroUpAttack1,
+  heroUpAttack2,
+  heroUpAttack3,
   heroRightIdle,
   heroRightWalk1,
   heroRightWalk2,
   heroRightWork1,
   heroRightWork2,
+  heroRightChop1,
+  heroRightChop2,
+  heroRightChop3,
+  heroRightAttack1,
+  heroRightAttack2,
+  heroRightAttack3,
   heroLeftIdle,
   heroLeftWalk1,
   heroLeftWalk2,
   heroLeftWork1,
   heroLeftWork2,
+  heroLeftChop1,
+  heroLeftChop2,
+  heroLeftChop3,
+  heroLeftAttack1,
+  heroLeftAttack2,
+  heroLeftAttack3,
   clerkIdle,
   clerkWalk1,
   clerkWalk2,

@@ -13,6 +13,7 @@
 	} from '$lib/game-engine';
 	import { Assets, Sprite, Texture } from 'pixi.js';
 	import { survivalSpriteUrls, type SurvivalSpriteKey } from '$lib/survival-loop-assets';
+	import { saveScore } from '$lib/scores';
 
 	let containerEl: HTMLDivElement;
 	let cleanup: (() => void) | undefined;
@@ -34,6 +35,10 @@
 		const ACD = 350;
 		const WORK_FRAME_MS = 180;
 		const WORK_ANIM_MS = 360;
+		const HERO_ATTACK_FRAME_MS = 140;
+		const HERO_ATTACK_ANIM_MS = 420;
+		const HERO_CHOP_FRAME_MS = 170;
+		const HERO_CHOP_ANIM_MS = 510;
 		const PR = 45;
 		const DR = 55;
 		const DMG = 6;
@@ -70,10 +75,14 @@
 		const clickArea = new Graphics();
 		const objLayer = new Container();
 		objLayer.sortableChildren = true;
+		objLayer.eventMode = 'none';
 		const itemLayer = new Container();
+		itemLayer.eventMode = 'none';
 		const charLayer = new Container();
 		charLayer.sortableChildren = true;
+		charLayer.eventMode = 'none';
 		const fxLayer = new Container();
+		fxLayer.eventMode = 'none';
 		world.addChild(groundLayer, zoneLayer, snowLayer, clickArea, objLayer, itemLayer, charLayer, fxLayer);
 		app.stage.addChild(world);
 		const hudLayer = new Container();
@@ -260,9 +269,17 @@
 			return dy > 0 ? 'down' : 'up';
 		}
 
-		function heroTexture(action: 'idle' | 'walk' | 'work', frame = 1) {
+		function heroTexture(action: 'idle' | 'walk' | 'work' | 'chop' | 'attack', frame = 1) {
 			const dir = P.dir[0].toUpperCase() + P.dir.slice(1);
-			const suffix = action === 'idle' ? 'Idle' : action === 'walk' ? `Walk${frame}` : `Work${frame}`;
+			const suffix = action === 'idle'
+				? 'Idle'
+				: action === 'walk'
+					? `Walk${frame}`
+					: action === 'work'
+						? `Work${frame}`
+						: action === 'chop'
+							? `Chop${frame}`
+							: `Attack${frame}`;
 			return tex[`hero${dir}${suffix}` as SurvivalSpriteKey];
 		}
 
@@ -886,6 +903,13 @@
 		function endGame() {
 			resultData = { trees: statTrees, animals: statBeasts, coins: statCoins, score };
 			state = 'result';
+			if (mode === 'normal') {
+				saveScore('survival-loop', {
+					score,
+					details: { trees: statTrees, bears: statBeasts, coins: statCoins },
+					finishedAt: new Date().toISOString()
+				});
+			}
 		}
 
 		// --- Main Loop ---
@@ -999,14 +1023,22 @@
 			pC.y = P.y;
 			pC.zIndex = P.y;
 			pBody.scale.x = 1;
-			if (atkRange && P.tgt && P.atkT > ACD - WORK_ANIM_MS) {
-				const frame = Math.floor(P.atkT / WORK_FRAME_MS) % 2 === 0 ? 1 : 2;
-				pSprite.texture = heroTexture('work', frame);
+			if (atkRange && P.tgt && P.atkT > ACD - ('vx' in P.tgt ? HERO_ATTACK_ANIM_MS : HERO_CHOP_ANIM_MS)) {
+				const isBearTarget = 'vx' in P.tgt;
+				const frameMs = isBearTarget ? HERO_ATTACK_FRAME_MS : HERO_CHOP_FRAME_MS;
+				const frame = Math.min(3, Math.floor((ACD - P.atkT) / frameMs) + 1);
+				pSprite.texture = heroTexture(isBearTarget ? 'attack' : 'chop', frame);
+				pSprite.width = 56;
+				pSprite.height = 66;
 			} else if (moving) {
 				const frame = Math.floor(P.walkT / 8) % 2 === 0 ? 1 : 2;
 				pSprite.texture = heroTexture('walk', frame);
+				pSprite.width = 48;
+				pSprite.height = 58;
 			} else {
 				pSprite.texture = heroTexture('idle');
+				pSprite.width = 48;
+				pSprite.height = 58;
 			}
 			pSprite.y = moving ? Math.sin(P.walkT * 0.35) * 2 : 0;
 			pC.alpha = P.invT > 0 ? (Math.floor(P.invT / 100) % 2 === 0 ? 0.3 : 1) : 1;
