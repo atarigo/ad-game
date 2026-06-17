@@ -50,6 +50,8 @@
 		justify-content: space-between;
 		padding: 0.5rem 1rem;
 		gap: 0.5rem;
+		position: relative;
+		z-index: 200;
 	}
 
 	.back {

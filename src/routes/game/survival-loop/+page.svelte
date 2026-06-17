@@ -1414,7 +1414,7 @@
 		};
 	}
 
-	function restart() { if (cleanup) cleanup(); state = 'menu'; }
+	function restart() { if (cleanup) cleanup(); containerEl.innerHTML = ''; state = 'menu'; }
 	function selectMode(mode: 'normal' | 'infinite') { startGame(mode); }
 	function pickGender(g: 'male' | 'female') { selectedGender = g; }
 	onMount(function () { return function () { if (cleanup) cleanup(); }; });
