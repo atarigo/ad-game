@@ -9,13 +9,13 @@
 
 <svelte:head>
 	<title>Ad Game — 假廣告遊戲集合</title>
-	<meta name="description" content="那些假廣告裡的遊戲，我們真的做出來了。" />
+	<meta name="description" content="這些遊戲我在哪看過呢？" />
 </svelte:head>
 
 <main>
 	<section class="hero">
 		<h1 class="glitch" data-text="AD GAME">AD GAME</h1>
-		<p class="tagline">那些假廣告裡的遊戲<br />我們真的做出來了。</p>
+		<p class="tagline">這些遊戲我在哪看過呢？</p>
 	</section>
 
 	<section class="games">
